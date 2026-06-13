@@ -179,16 +179,24 @@
           class="zoom-mock relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--color-border-strong)] bg-[#1a1a1f] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.35)]"
           aria-hidden="true"
         >
-          {/* Window chrome */}
+          {/* Window chrome — Windows-style (NOT Mac dots — primary audience is Win users) */}
           <div
-            class="flex items-center gap-1.5 border-b border-white/5 bg-[#0d0d12] px-3 py-2"
+            class="flex items-center justify-between border-b border-white/5 bg-[#0d0d12] px-3 py-1.5"
           >
-            <span class="h-2.5 w-2.5 rounded-full bg-[#ff5f57]"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-[#28ca42]"></span>
-            <span class="ml-3 text-[10px] font-medium tracking-wide text-white/40">
+            <span class="text-[10px] font-medium tracking-wide text-white/40">
               Zoom Meeting · Q3 Strategy Review
             </span>
+            <div class="flex items-center gap-3 text-white/40">
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                <rect x="2" y="5.5" width="8" height="1"></rect>
+              </svg>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true">
+                <rect x="2" y="2" width="8" height="8"></rect>
+              </svg>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="M2 2l8 8M10 2L2 10"></path>
+              </svg>
+            </div>
           </div>
 
           {/* Video tile grid (2x2) */}
@@ -244,7 +252,7 @@
 
         {/* THE STICKY NOTE — floating over the Zoom call, with strong ambient glow */}
         <div
-          class="sticky-note pointer-events-auto absolute -right-2 top-12 w-[240px] -rotate-[3deg] rounded-md bg-[#fde047] p-4 shadow-[0_0_100px_-8px_rgba(253,224,71,0.65),0_0_40px_-8px_rgba(253,224,71,0.5),0_2px_4px_rgba(0,0,0,0.08),0_12px_24px_-4px_rgba(0,0,0,0.18),0_24px_48px_-12px_rgba(0,0,0,0.35)] transition-transform duration-300 hover:rotate-0 hover:scale-[1.03] md:-right-6 md:top-16 md:w-[280px]"
+          class="sticky-note pointer-events-auto absolute -right-2 top-12 w-[240px] -rotate-[3deg] rounded-md bg-[#fde047] p-4 shadow-[0_0_140px_-4px_rgba(253,224,71,0.85),0_0_80px_-8px_rgba(253,224,71,0.7),0_0_30px_-4px_rgba(253,224,71,0.5),0_2px_4px_rgba(0,0,0,0.08),0_12px_24px_-4px_rgba(0,0,0,0.18),0_24px_48px_-12px_rgba(0,0,0,0.4)] transition-transform duration-300 hover:rotate-0 hover:scale-[1.03] md:-right-6 md:top-16 md:w-[280px]"
           style="background-image: radial-gradient(rgba(0,0,0,0.04) 1px, transparent 1px); background-size: 16px 16px;"
         >
           {/* Tape strip at top */}
