@@ -1,0 +1,29 @@
+# Cloudflare Pages headers — applied to static assets at edge.
+# See: https://developers.cloudflare.com/pages/configuration/headers/
+
+# Default security headers (apply to all paths).
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+
+# Long-cache for build hashes (Astro adds content hashes to filenames).
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Don't cache HTML — let it revalidate so users get latest fixes fast.
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Service worker should never be cached at edge.
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Mark Cloudflare Pages preview URLs as noindex to prevent SEO duplication.
+# (The production custom domain alwaysontopnotes.com is the canonical one.)
+# This header only attaches when the request is served from *.pages.dev.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex, nofollow
