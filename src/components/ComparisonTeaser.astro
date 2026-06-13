@@ -1,0 +1,226 @@
+---
+/**
+ * ComparisonTeaser — 3-row preview of the full comparison table.
+ *
+ * Drives clicks to /compare (full table — shipped in commit 5).
+ * Three most-painful frustrations chosen for emotional punch.
+ */
+const competitors = [
+  { name: "Windows Sticky Notes", id: "winsticky" },
+  { name: "macOS Stickies", id: "macsticky" },
+  { name: "Apple Notes / Keep", id: "cloudnotes" },
+];
+
+const rows = [
+  {
+    feature: "Floats over fullscreen Zoom",
+    us: true,
+    others: [false, false, false],
+  },
+  {
+    feature: "Works on Mac AND Windows AND Linux",
+    us: true,
+    others: [false, false, true], // cloud notes work cross-OS but upload
+  },
+  {
+    feature: "Notes never uploaded anywhere",
+    us: true,
+    others: [true, true, false],
+  },
+];
+---
+
+<section class="mx-auto max-w-[1200px] px-6 py-16 md:px-12 md:py-24">
+  <div class="max-w-2xl">
+    <span
+      class="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent-strong)]"
+    >
+      How we stack up
+    </span>
+    <h2
+      class="mt-3 text-3xl font-bold tracking-tight text-[var(--color-fg)] md:text-4xl lg:text-5xl"
+    >
+      The three things that
+      <span class="relative inline-block">
+        <span class="relative z-10">matter most.</span>
+        <span
+          class="absolute inset-x-0 bottom-1 h-3 -skew-y-1 bg-[var(--color-accent)] opacity-80"
+          aria-hidden="true"
+        ></span>
+      </span>
+    </h2>
+  </div>
+
+  <div
+    class="mt-12 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
+  >
+    {/* Desktop table */}
+    <table class="hidden w-full md:table">
+      <thead>
+        <tr class="border-b border-[var(--color-border)]">
+          <th
+            class="px-6 py-5 text-left text-sm font-semibold text-[var(--color-fg-muted)]"
+            scope="col"
+          >
+            Feature
+          </th>
+          {competitors.map((c) => (
+            <th
+              class="px-6 py-5 text-center text-sm font-semibold text-[var(--color-fg-muted)]"
+              scope="col"
+            >
+              {c.name}
+            </th>
+          ))}
+          <th
+            class="bg-[var(--color-accent)]/25 px-6 py-5 text-center text-sm font-bold text-[var(--color-fg)] ring-1 ring-inset ring-[var(--color-accent)]/40"
+            scope="col"
+          >
+            AlwaysOnTopNotes
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr
+            class:list={[
+              "border-b border-[var(--color-border)]",
+              i === rows.length - 1 && "border-b-0",
+            ]}
+          >
+            <th
+              class="px-6 py-5 text-left text-sm font-medium text-[var(--color-fg)]"
+              scope="row"
+            >
+              {row.feature}
+            </th>
+            {row.others.map((v) => (
+              <td class="px-6 py-5 text-center">
+                {v ? (
+                  <span
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-green-500/10 text-green-600"
+                    aria-label="Yes"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                ) : (
+                  <span
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-500/10 text-red-500/80"
+                    aria-label="No"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </span>
+                )}
+              </td>
+            ))}
+            <td class="bg-[var(--color-accent)]/15 px-6 py-5 text-center ring-1 ring-inset ring-[var(--color-accent)]/30">
+              <span
+                class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--color-accent)] text-yellow-950"
+                aria-label="Yes"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+    {/* Mobile cards */}
+    <div class="divide-y divide-[var(--color-border)] md:hidden">
+      {rows.map((row) => (
+        <div class="px-5 py-5">
+          <h3 class="text-base font-semibold text-[var(--color-fg)]">
+            {row.feature}
+          </h3>
+          <ul class="mt-3 space-y-2 text-sm">
+            {competitors.map((c, idx) => (
+              <li class="flex items-center justify-between">
+                <span class="text-[var(--color-fg-muted)]">{c.name}</span>
+                {row.others[idx] ? (
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-500/10 text-green-600">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </span>
+                ) : (
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-500/10 text-red-500/80">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  </span>
+                )}
+              </li>
+            ))}
+            <li class="flex items-center justify-between border-t border-[var(--color-border)] pt-2">
+              <span class="font-bold text-[var(--color-fg)]">AlwaysOnTopNotes</span>
+              <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-accent)] text-yellow-950">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              </span>
+            </li>
+          </ul>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  <div class="mt-8 flex flex-wrap items-center gap-3">
+    <a
+      href="/compare"
+      class="group inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-fg)] underline-offset-4 hover:underline"
+    >
+      See the full 12-row comparison
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        class="transition-transform duration-150 group-hover:translate-x-0.5"
+      >
+        <path d="M5 12h14M12 5l7 7-7 7"></path>
+      </svg>
+    </a>
+    <span class="text-sm text-[var(--color-fg-subtle)]">
+      · or just{" "}
+      <a href="/app" class="text-[var(--color-fg-muted)] underline underline-offset-2 hover:text-[var(--color-fg)]">try it now</a>
+    </span>
+  </div>
+</section>

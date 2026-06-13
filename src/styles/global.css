@@ -28,6 +28,7 @@ html[data-theme="dark"] {
   --color-fg-subtle: #737373;
   --color-accent: #fde047;
   --color-accent-soft: #fef08a;
+  --color-accent-strong: #fde047;
   --color-success: #4ade80;
   --color-online: #22c55e;
   --color-warning: #f7b955;
@@ -46,6 +47,7 @@ html[data-theme="light"] {
   --color-fg-subtle: #737373;
   --color-accent: #facc15;
   --color-accent-soft: #fde68a;
+  --color-accent-strong: #a16207;
   --color-success: #16a34a;
   --color-online: #16a34a;
   --color-warning: #f5a623;
