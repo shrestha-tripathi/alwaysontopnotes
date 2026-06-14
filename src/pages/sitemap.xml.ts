@@ -1,17 +1,24 @@
 import type { APIRoute } from "astro";
 import { site } from "../site.config";
 
+/**
+ * Sitemap — ONLY real, indexable, public pages belong here.
+ *
+ * Deliberately EXCLUDED:
+ * - `/app` — the notes app itself is `noindex` (it's the tool, not content).
+ *   Listing a noindexed URL in the sitemap is a Search-Console warning
+ *   ("Submitted URL marked noindex"), so it's dropped.
+ * - `/offline`, `/404` — noindex utility pages, never indexable.
+ * - `/how-it-works`, `/install`, `/about`, `/contact`, `/privacy-policy`,
+ *   `/terms` — these routes do NOT exist yet (they'd 404). A sitemap must
+ *   never list URLs that 404. Re-add each here the SAME commit its page ships.
+ *
+ * Keep this list in lockstep with the actual indexable pages in src/pages/.
+ */
 const pages = [
   { path: "/", priority: 1.0, changefreq: "weekly" },
-  { path: "/app", priority: 0.9, changefreq: "monthly" },
-  { path: "/how-it-works", priority: 0.8, changefreq: "monthly" },
   { path: "/compare", priority: 0.8, changefreq: "monthly" },
   { path: "/faq", priority: 0.7, changefreq: "monthly" },
-  { path: "/install", priority: 0.6, changefreq: "monthly" },
-  { path: "/about", priority: 0.5, changefreq: "yearly" },
-  { path: "/contact", priority: 0.5, changefreq: "yearly" },
-  { path: "/privacy-policy", priority: 0.3, changefreq: "yearly" },
-  { path: "/terms", priority: 0.3, changefreq: "yearly" },
 ];
 
 const today = new Date().toISOString().split("T")[0];

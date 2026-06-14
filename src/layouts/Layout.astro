@@ -24,6 +24,15 @@ export interface Props {
   ogImage?: string;
   /** Add hreflang alternates. */
   noindex?: boolean;
+  /**
+   * Extra page-specific JSON-LD schema objects, layered ON TOP of the sitewide
+   * Organization + WebSite graph. Each entry is emitted as its own
+   * `<script type="application/ld+json">`. e.g. the homepage passes a
+   * `WebApplication` node; an FAQ page could pass a `FAQPage` node. Keep these
+   * `@id`-linked back to the sitewide Organization where it makes sense
+   * (publisher refs) so the graph stays connected.
+   */
+  jsonLd?: Record<string, unknown>[];
 }
 
 const {
@@ -32,6 +41,7 @@ const {
   canonical,
   ogImage,
   noindex = false,
+  jsonLd = [],
 } = Astro.props;
 
 const pageTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.tagline}`;
@@ -44,10 +54,14 @@ const canonicalUrl = canonical
 // OG image — fall back to site default. Must be absolute URL.
 const ogImageUrl = ogImage ?? new URL("/og-image.png", site.url).toString();
 
-// JSON-LD Organization + WebSite schemas — high-value SEO signal.
+// JSON-LD Organization + WebSite schemas — high-value SEO signal. The
+// Organization carries a stable @id so page-level nodes (e.g. the homepage's
+// WebApplication) can `publisher`-reference it and keep the graph connected.
+const orgId = `${site.url}/#organization`;
 const jsonLdOrg = {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": orgId,
   name: site.name,
   url: site.url,
   sameAs: [site.githubRepo].filter(Boolean),
@@ -104,6 +118,10 @@ const jsonLdWebSite = {
     {/* JSON-LD structured data */}
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLdOrg)} />
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLdWebSite)} />
+    {/* Page-specific schema layered on top (e.g. WebApplication on the homepage). */}
+    {jsonLd.map((node) => (
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(node)} />
+    ))}
 
     {/*
       Theme bootstrap — runs synchronously BEFORE paint to prevent FOUC.

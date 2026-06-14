@@ -7,9 +7,48 @@ import SwitchChips from "../components/SwitchChips.astro";
 import ComparisonTeaser from "../components/ComparisonTeaser.astro";
 import FAQ from "../components/FAQ.astro";
 import Footer from "../components/Footer.astro";
+import { site } from "../site.config";
+
+/**
+ * Homepage WebApplication JSON-LD — layered on top of the sitewide
+ * Organization + WebSite graph (emitted by Layout). Makes AOTN eligible for
+ * the app rich result (price, category, rating-ready). `publisher` @id-refs
+ * the sitewide Organization so the graph stays connected. featureList mirrors
+ * the "Why switch" answers; browserRequirements documents the Document-PiP
+ * floor for the floating window.
+ */
+const webAppJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "@id": `${site.url}/#webapp`,
+  name: site.name,
+  url: `${site.url}/app`,
+  description: site.description,
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "Any",
+  browserRequirements:
+    "Requires a modern browser. The floating always-on-top window uses the Document Picture-in-Picture API (Chrome 116+ or Edge 116+); core note-taking works in any current browser.",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  featureList: [
+    "Floats over every fullscreen app",
+    "Works on every desktop",
+    "Nothing leaves your device",
+    "Full rich text + markdown",
+    "One-click markdown export",
+    "Keyboard-first shortcuts",
+    "MIT open source",
+  ],
+  isAccessibleForFree: true,
+  inLanguage: site.locale,
+  publisher: { "@id": `${site.url}/#organization` },
+};
 ---
 
-<Layout>
+<Layout jsonLd={[webAppJsonLd]}>
   <Nav />
 
   <main>
