@@ -1,29 +1,98 @@
-# Cloudflare Pages headers — applied to static assets at edge.
+# Cloudflare Pages headers — applied to all routes at the edge.
 # See: https://developers.cloudflare.com/pages/configuration/headers/
+#
+# Mirrors the convention used across the worksoffline.in micro-tool family
+# (FileTransferNow, HEICPix, ScreenColorPicker, LiveCaptionIt) for security
+# defaults + cache TTLs + preview-domain noindex.
 
-# Default security headers (apply to all paths).
+# --------------------------------------------------------------------------
+# Default security headers (apply to all paths on all hostnames)
+# --------------------------------------------------------------------------
+#
+# Permissions-Policy notes:
+#   - picture-in-picture=(self)  → required for Document Picture-in-Picture
+#     API, our core "always-on-top" feature. Without this, PiP would fail
+#     silently when AOTN is embedded in an iframe (Product Hunt, blog widgets).
+#   - web-share=(self)            → forward-looking for the "share note" button.
+#   - All hardware / capture APIs explicitly denied — we are a privacy-first
+#     local-only notes app, never need them.
+#
+# Cross-Origin-Opener-Policy: same-origin — strict isolation, prevents other
+# origins from getting window references to our pages. Safe with Document PiP
+# (same-origin) and our app has no OAuth popup flows.
+
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), display-capture=(), usb=(), serial=(), bluetooth=(), hid=(), payment=(), picture-in-picture=(self), web-share=(self)
 
-# Long-cache for build hashes (Astro adds content hashes to filenames).
+# --------------------------------------------------------------------------
+# Caching
+# --------------------------------------------------------------------------
+
+# Hashed Astro assets — cache forever, immutable
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Don't cache HTML — let it revalidate so users get latest fixes fast.
+# HTML — always revalidate so users get latest fixes fast
 /*.html
   Cache-Control: public, max-age=0, must-revalidate
 /
   Cache-Control: public, max-age=0, must-revalidate
 
-# Service worker should never be cached at edge.
-/sw.js
-  Cache-Control: public, max-age=0, must-revalidate
+# Sitemap & robots — short cache so SEO updates ship fast
+/sitemap.xml
+  Cache-Control: public, max-age=3600
+/robots.txt
+  Cache-Control: public, max-age=3600
 
-# Mark Cloudflare Pages preview URLs as noindex to prevent SEO duplication.
-# (The production custom domain alwaysontopnotes.com is the canonical one.)
-# This header only attaches when the request is served from *.pages.dev.
-https://:project.pages.dev/*
+# Service worker — never cache (always check for updates)
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Favicon assets — cache 30 days (some files ship in Phase 4)
+/favicon.svg
+  Cache-Control: public, max-age=2592000
+/favicon.ico
+  Cache-Control: public, max-age=2592000
+  Content-Type: image/x-icon
+/apple-touch-icon.png
+  Cache-Control: public, max-age=2592000
+/icon-192.png
+  Cache-Control: public, max-age=2592000
+/icon-512.png
+  Cache-Control: public, max-age=2592000
+
+# Manifest — short cache + explicit MIME (ships in Phase 4)
+/manifest.webmanifest
+  Cache-Control: public, max-age=3600
+  Content-Type: application/manifest+json
+
+# --------------------------------------------------------------------------
+# Noindex the .pages.dev infrastructure domain(s)
+# --------------------------------------------------------------------------
+# Cloudflare Pages serves the site at the .pages.dev hostname AND at any
+# attached custom domain. Same HTML reachable at both:
+#
+#   https://alwaysontopnotes.com         (canonical, indexable)
+#   https://alwaysontopnotes.pages.dev   (infra preview, NOT indexable)
+#
+# Google treats this as duplicate content and may split ranking signal
+# across both, or pick the wrong domain as canonical. Same risk applies
+# to per-branch / per-commit preview deploys at *.alwaysontopnotes.pages.dev.
+#
+# Fix: send `X-Robots-Tag: noindex, nofollow` on every response served from
+# the .pages.dev hostnames. Hostname-scoped (full URL prefix) — requests to
+# alwaysontopnotes.com don't match and stay fully indexable.
+#
+# Combined with the canonical <link> in Layout.astro (which always points
+# at site.url = the .com domain), this fully de-prioritizes the preview
+# infra in SERPs.
+
+https://alwaysontopnotes.pages.dev/*
+  X-Robots-Tag: noindex, nofollow
+
+https://*.alwaysontopnotes.pages.dev/*
   X-Robots-Tag: noindex, nofollow
