@@ -578,6 +578,36 @@ html[data-theme="dark"] .sticky-card:hover {
   background-color: color-mix(in srgb, var(--note-edge) 55%, transparent);
 }
 
+/* The color-picker dot mirrors the active note color, but the toolbar is now
+   tinted that SAME color — so the dot's fill is camouflaged. A double ring makes
+   it pop: a pure-WHITE band (the glow edge) + a near-solid DARK keyline. The
+   keyline is the hero — every sticky swatch is a LIGHT pastel (cream/yellow/blue/
+   etc.), and swatches are theme-INDEPENDENT, so the toolbar behind the dot is a
+   light pastel in BOTH light AND dark theme. The dot NEVER sits on the dark
+   board, so ONE ring works everywhere — no dark-theme variant needed (a softer
+   keyline just washed to muddy gray on the pastel; pixel-verified). A soft white
+   bloom adds the "glow". */
+#color-btn-dot {
+  box-shadow:
+    0 0 0 2.5px #fff,
+    0 0 0 4px rgba(17, 17, 17, 0.85),
+    0 0 10px 2px rgba(255, 255, 255, 0.9);
+  transition: box-shadow 140ms ease;
+}
+/* Hover/focus lifts the glow so the control feels alive. */
+#color-btn:hover #color-btn-dot,
+#color-btn:focus-visible #color-btn-dot {
+  box-shadow:
+    0 0 0 2.5px #fff,
+    0 0 0 4px rgba(17, 17, 17, 0.9),
+    0 0 14px 3px rgba(255, 255, 255, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  #color-btn-dot {
+    transition: none;
+  }
+}
+
 /* ── PiP-only: paint the GLOBAL header too, so the ENTIRE float is one solid
    sticky note. In the normal two-pane app the header stays themed (a colored
    app-bar next to a gray sidebar would look broken) — but in PiP the brand is
