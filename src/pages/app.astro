@@ -259,6 +259,45 @@ import { site } from "../site.config";
         ></button>
       </div>
     </div>
+
+    {/* Keyboard-shortcuts modal (opened with `?`). Backdrop + centered card. */}
+    <div
+      id="shortcuts-modal"
+      class="fixed inset-0 z-[70] hidden items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="shortcuts-title"
+    >
+      <div id="shortcuts-backdrop" class="absolute inset-0 bg-black/50"></div>
+      <div class="relative w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-5 shadow-2xl">
+        <div class="mb-3 flex items-center justify-between">
+          <h2 id="shortcuts-title" class="text-base font-semibold text-[var(--color-fg)]">
+            Keyboard shortcuts
+          </h2>
+          <button
+            id="shortcuts-close"
+            type="button"
+            aria-label="Close"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <dl class="flex flex-col gap-0.5 text-sm">
+          <div class="shortcut-row"><dt>New note</dt><dd><kbd class="kbd">N</kbd></dd></div>
+          <div class="shortcut-row"><dt>Focus search</dt><dd><kbd class="kbd">/</kbd></dd></div>
+          <div class="shortcut-row"><dt>Move down / up</dt><dd><kbd class="kbd">J</kbd><kbd class="kbd">K</kbd></dd></div>
+          <div class="shortcut-row"><dt>Bold / italic / link</dt><dd><kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">B</kbd> / <kbd class="kbd">I</kbd> / <kbd class="kbd">K</kbd></dd></div>
+          <div class="shortcut-row"><dt>Force save</dt><dd><kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">S</kbd></dd></div>
+          <div class="shortcut-row"><dt>Delete note</dt><dd><kbd class="kbd">Ctrl</kbd>+<kbd class="kbd">⌫</kbd></dd></div>
+          <div class="shortcut-row"><dt>Clear search / close</dt><dd><kbd class="kbd">Esc</kbd></dd></div>
+          <div class="shortcut-row"><dt>This menu</dt><dd><kbd class="kbd">?</kbd></dd></div>
+        </dl>
+        <p class="mt-3 text-xs text-[var(--color-fg-subtle)]">
+          On Mac, use <kbd class="kbd">⌘</kbd> instead of <kbd class="kbd">Ctrl</kbd>.
+        </p>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -266,6 +305,7 @@ import { site } from "../site.config";
     import { searchNotes } from "../lib/searchNotes";
     import { swatchOf, rotationFor, SWATCHES, COLOR_ORDER } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
+    import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
@@ -290,6 +330,9 @@ import { site } from "../site.config";
     const colorGrid = $("color-grid");
     const deleteBtn = $<HTMLButtonElement>("delete-btn");
     const bubbleEl = $("bubble-menu");
+    const shortcutsModal = $("shortcuts-modal");
+    const shortcutsClose = $<HTMLButtonElement>("shortcuts-close");
+    const shortcutsBackdrop = $("shortcuts-backdrop");
     const toastEl = $("toast");
     const toastMsg = $("toast-msg");
     const toastAction = $<HTMLButtonElement>("toast-action");
@@ -641,6 +684,45 @@ import { site } from "../site.config";
         .forEach((b) => b.classList.toggle("is-active", b.dataset.color === cur));
     }
 
+    // ── shortcuts modal ──────────────────────────────────────────────────
+    function openShortcuts(): void {
+      shortcutsModal.classList.remove("hidden");
+      shortcutsModal.classList.add("flex");
+      shortcutsClose.focus();
+    }
+    function closeShortcuts(): void {
+      shortcutsModal.classList.add("hidden");
+      shortcutsModal.classList.remove("flex");
+    }
+    const isShortcutsOpen = (): boolean => !shortcutsModal.classList.contains("hidden");
+
+    // ── J/K list navigation ──────────────────────────────────────────────
+    // Move the selection down (+1) or up (-1) through the CURRENTLY VISIBLE,
+    // search-filtered, sorted list — mirrors exactly what the sidebar shows
+    // (so navigation matches the user's eyes, including during a search).
+    function navigateList(delta: 1 | -1): void {
+      const state = notesStore.get();
+      const visible = searchNotes(state.index, state.query);
+      if (visible.length === 0) return;
+      const curIdx = visible.findIndex((e) => e.id === state.activeId);
+      // No selection yet → J picks the first, K picks the last.
+      let nextIdx: number;
+      if (curIdx === -1) {
+        nextIdx = delta === 1 ? 0 : visible.length - 1;
+      } else {
+        nextIdx = curIdx + delta;
+        if (nextIdx < 0 || nextIdx >= visible.length) return; // clamp at edges
+      }
+      const next = visible[nextIdx];
+      void notesStore.selectNote(next.id);
+      // Keep the newly-selected card in view (it may be below the fold).
+      requestAnimationFrame(() => {
+        listEl
+          .querySelector<HTMLElement>(`li[data-id="${next.id}"]`)
+          ?.scrollIntoView({ block: "nearest" });
+      });
+    }
+
     // ── event wiring ────────────────────────────────────────────────────
 
     /** Focus the editor once it exists (created lazily on first select). */
@@ -706,6 +788,10 @@ import { site } from "../site.config";
       if (!colorPopover.contains(t) && !colorBtn.contains(t)) closeColorPopover();
     });
 
+    // Shortcuts modal: close via the × button or a backdrop click.
+    shortcutsClose.addEventListener("click", closeShortcuts);
+    shortcutsBackdrop.addEventListener("click", closeShortcuts);
+
     toastAction.addEventListener("click", () => {
       notesStore.undoDelete();
       hideToast();
@@ -747,33 +833,76 @@ import { site } from "../site.config";
       void loadNoteIntoEditor(id, doc as JSONContent, true);
     });
 
-    // Keyboard: N = new, / = search (when not typing)
+    // Keyboard map (Phase 2 subset — SPEC-Phase2 §8)
     document.addEventListener("keydown", (e) => {
-      // Escape closes the color popover first (works even with editor focused).
-      if (e.key === "Escape" && isColorPopoverOpen()) {
-        e.preventDefault();
-        closeColorPopover();
-        return;
-      }
       const el = document.activeElement as HTMLElement | null;
-      // Escape in the search box: clear the query (if any) then blur. This is a
-      // context-aware Esc — it works WHILE the input is focused, so it must run
-      // before the generic "typing → bail" guard below.
-      if (e.key === "Escape" && el === searchEl) {
-        e.preventDefault();
-        if (searchEl.value) {
-          searchEl.value = "";
-          notesStore.setQuery("");
-        } else {
-          searchEl.blur();
-        }
-        return;
-      }
       const typing =
         el &&
         (el.tagName === "INPUT" ||
           el.tagName === "TEXTAREA" ||
           el.isContentEditable); // .ProseMirror is contentEditable → covered
+
+      // ── Escape: close the topmost overlay, context-aware ──────────────
+      if (e.key === "Escape") {
+        if (isShortcutsOpen()) {
+          e.preventDefault();
+          closeShortcuts();
+          return;
+        }
+        if (isColorPopoverOpen()) {
+          e.preventDefault();
+          closeColorPopover();
+          return;
+        }
+        if (el === searchEl) {
+          e.preventDefault();
+          if (searchEl.value) {
+            searchEl.value = "";
+            notesStore.setQuery("");
+          } else {
+            searchEl.blur();
+          }
+          return;
+        }
+      }
+
+      // ── Cmd/Ctrl shortcuts: work EVEN while typing in the editor ───────
+      if (e.metaKey || e.ctrlKey) {
+        const k = e.key.toLowerCase();
+        if (k === "s") {
+          // Force save: flush the pending debounce now + flash "Saved ✓". The
+          // note already autosaves, but Cmd+S is muscle memory → reassurance.
+          e.preventDefault();
+          if (saveDebounce && editor) {
+            clearTimeout(saveDebounce);
+            saveDebounce = null;
+            void notesStore.updateActiveDoc(editor.getJSON() as JSONContent);
+          }
+          setSaveStatus("saved");
+          return;
+        }
+        if (e.key === "Backspace") {
+          // Delete the current note → 5s undo toast (§6).
+          const id = notesStore.get().activeId;
+          if (id) {
+            e.preventDefault();
+            void notesStore.deleteNote(id);
+          }
+          return;
+        }
+        return; // leave all other Cmd/Ctrl combos to Tiptap / the browser
+      }
+
+      // ── `?` opens the shortcuts modal (allowed even when not typing) ───
+      // `?` is Shift+/ on most layouts; gate on the produced char, not the code.
+      if (e.key === "?" && !typing) {
+        e.preventDefault();
+        if (isShortcutsOpen()) closeShortcuts();
+        else openShortcuts();
+        return;
+      }
+
+      // ── Single-key shortcuts: only when NOT typing ────────────────────
       if (typing) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
@@ -783,6 +912,12 @@ import { site } from "../site.config";
         e.preventDefault();
         searchEl.focus();
         searchEl.select();
+      } else if (e.key === "j" || e.key === "J") {
+        e.preventDefault();
+        navigateList(1);
+      } else if (e.key === "k" || e.key === "K") {
+        e.preventDefault();
+        navigateList(-1);
       }
     });
 
@@ -800,6 +935,13 @@ import { site } from "../site.config";
     (async () => {
       const adapter = await pickStorage();
       await notesStore.init(adapter);
+      // First-run welcome note (UX-CHARTER §empty). Seed only when the user has
+      // NO notes AND hasn't been welcomed before — so we never inject it on top
+      // of real notes, and it never re-appears after they delete/dismiss it.
+      if (!hasWelcomed() && notesStore.get().index.length === 0) {
+        markWelcomed();
+        void notesStore.seedNote(welcomeDoc() as JSONContent, WELCOME_COLOR);
+      }
       render(notesStore.get());
     })();
   </script>

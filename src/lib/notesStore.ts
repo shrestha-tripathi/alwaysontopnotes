@@ -258,6 +258,36 @@ class NotesStore {
     return note.id;
   }
 
+  /**
+   * Seed a note from a pre-built rich doc (e.g. the first-run welcome note).
+   * Unlike createNote (blank), this persists a full doc and derives title/
+   * plainText from it. Selects it so the user lands on real content. Returns
+   * the new id.
+   */
+  async seedNote(doc: Note["doc"], color: StickyColor = DEFAULT_COLOR): Promise<string> {
+    const ts = now();
+    const plainText = docToText(doc);
+    const note: Note = {
+      id: uuid(),
+      v: SCHEMA_VERSION,
+      doc,
+      plainText,
+      title: deriveTitle(plainText),
+      color,
+      pinned: false,
+      createdAt: ts,
+      updatedAt: ts,
+    };
+    this.track(note);
+    this.setState({
+      index: this.reindex(),
+      activeId: note.id,
+      active: note,
+    });
+    void this.persist(note);
+    return note.id;
+  }
+
   /** Select a note (lazy-loads its full doc from cache or adapter). */
   async selectNote(id: string | null): Promise<void> {
     if (id === null) {

@@ -401,3 +401,45 @@ html[data-theme="dark"] .sticky-card:hover {
   letter-spacing: 0;
   color: var(--color-fg-muted);
 }
+
+/* ============================================================
+   Keyboard-shortcuts modal (commit 11)
+   ============================================================ */
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+.shortcut-row:last-child {
+  border-bottom: none;
+}
+.shortcut-row dt {
+  color: var(--color-fg-muted);
+}
+.shortcut-row dd {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-fg-subtle);
+}
+/* Keycap chip — used in the modal + inline hints. */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  background: var(--color-bg-muted);
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+}
