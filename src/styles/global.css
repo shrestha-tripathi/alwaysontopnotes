@@ -888,29 +888,35 @@ html[data-theme="dark"] .sticky-card:hover {
   background-color: color-mix(in srgb, var(--note-ink) 55%, transparent);
 }
 
-/* In the PiP float specifically, make the scrollbar comfortably DRAGGABLE. A
-   400px-wide window invites grabbing the bar (vs the wheel/trackpad you'd use
-   in the wide two-pane app), but the 9px bar with a 2px inset border leaves
-   only ~5px of grabbable thumb — too fine to catch in a small floating window.
-   Here: a wider bar, a thinner inset (more painted thumb), and a faint visible
-   track gutter so the hit area is discoverable and click-beside still reads as
-   a scroll region. Scoped to .pip-mode so the two-pane app keeps the slim bar. */
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+/* ⚠️ PiP scrollbar drag fix (the real one). Custom CSS-painted
+   `::-webkit-scrollbar` thumbs PAINT but don't receive DRAG hit-testing inside a
+   Document Picture-in-Picture window (a Chromium quirk — the composited custom
+   bar isn't wired to the float's input). Symptom: the bar shows but you can't
+   grab + drag it. An earlier fix enlarged the thumb (min-height/width) and
+   changed NOTHING — proving the issue is interactivity, not size. The fix is to
+   turn OFF the custom webkit scrollbar in the float and fall back to the NATIVE
+   scrollbar, which IS draggable in PiP; we still style it via the standard
+   `scrollbar-width`/`scrollbar-color` props (Firefox + the PiP native bar both
+   honor these), so it stays thin + on-brand. The wide two-pane app keeps the
+   pretty custom bar above. Scoped to `:where(.pip-mode)`. */
+:where(.pip-mode) .nice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-fg) 35%, transparent) transparent;
 }
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--color-fg) 7%, transparent);
-  border-radius: 9999px;
+/* Reset every custom webkit pseudo back to the native bar inside the float so
+   Chromium renders (and hit-tests) its own draggable scrollbar. */
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar,
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-track,
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb,
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb:hover,
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb:active,
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-button,
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-corner {
+  all: revert;
 }
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb {
-  /* 3px inset on a 14px bar → ~8px painted, comfortably grabbable thumb. */
-  border: 3px solid transparent;
-}
-/* On the tinted editor surface in PiP, the gutter follows the note ink so it
-   still belongs to the paper. */
-:where(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-track {
-  background: color-mix(in srgb, var(--note-ink) 9%, transparent);
+/* On the tinted editor surface in PiP, the native thumb follows the note ink. */
+:where(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll {
+  scrollbar-color: color-mix(in srgb, var(--note-ink) 45%, transparent) transparent;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
