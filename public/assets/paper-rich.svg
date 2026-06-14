@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <!--
+    Realistic paper texture overlay (opt-in "Paper texture" preference).
+    A richer, more tactile grain than the default paper-noise.svg (~3.8%):
+    two composited layers give it real fiber depth while staying tasteful —
+      1. a fine high-frequency grain (the tooth of the paper)
+      2. a coarser low-frequency fiber/cloud (long paper fibers + subtle mottle)
+    Both desaturated to gray so the texture reads identically over every literal
+    swatch and in both light/dark chrome (composited via background-blend-mode:
+    multiply over the note color, same as the default). Self-contained (~1 KB),
+    tiles seamlessly via stitchTiles. Stronger than the default but kept under
+    ~9% so text stays crisp — this is "nice paper", not "noisy".
+  -->
+  <defs>
+    <filter id="grainFine" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+    </filter>
+    <filter id="fiberCoarse" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.014 0.16" numOctaves="3" seed="4" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+    </filter>
+  </defs>
+  <!-- coarse long-fiber mottle (gives the paper its "grain direction") -->
+  <rect width="180" height="180" filter="url(#fiberCoarse)" opacity="0.05"/>
+  <!-- fine tooth on top -->
+  <rect width="180" height="180" filter="url(#grainFine)" opacity="0.075"/>
+</svg>
