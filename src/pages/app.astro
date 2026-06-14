@@ -45,6 +45,25 @@ import { site } from "../site.config";
           class="text-xs text-[var(--color-fg-subtle)] tabular-nums"
           aria-live="polite"
         ></span>
+        {/* Document PiP toggle — pops the app shell into a floating window.
+            Hidden by default; the island unhides it only on Chromium 116+. */}
+        <button
+          id="pip-toggle"
+          type="button"
+          class="hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+          aria-label="Pop out into floating window"
+          title="Pop out into a floating window"
+        >
+          <svg id="pip-icon-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 9V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4"></path>
+            <rect width="10" height="7" x="12" y="13" rx="2"></rect>
+          </svg>
+          <svg id="pip-icon-close" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3"></path>
+            <path d="m17 13-4 4 4 4"></path>
+            <path d="M22 17h-9"></path>
+          </svg>
+        </button>
         <span class="hidden text-xs text-[var(--color-fg-subtle)] sm:inline">
           🔒 On your device
         </span>
@@ -300,11 +319,36 @@ import { site } from "../site.config";
     </div>
   </div>
 
+  {/* PiP placeholder — shown in the origin tab while the app shell is floating
+      in the PiP window. SIBLING of #app-root (not a child) so the reparent
+      that empties #app-root's slot leaves this behind to fill the origin tab. */}
+  <div
+    id="pip-placeholder"
+    class="hidden h-[100dvh] flex-col items-center justify-center gap-4 bg-[var(--color-bg)] p-8 text-center"
+  >
+    <div class="text-5xl">📺</div>
+    <h2 class="text-lg font-semibold text-[var(--color-fg)]">
+      Floating in a Picture-in-Picture window
+    </h2>
+    <p class="max-w-sm text-sm text-[var(--color-fg-muted)]">
+      Your note is in a small always-on-top window. Keep it visible while you
+      work in another app.
+    </p>
+    <button
+      id="pip-bring-back"
+      type="button"
+      class="inline-flex items-center gap-2 rounded-md bg-[var(--color-fg)] px-4 py-2 text-sm font-semibold text-[var(--color-bg)] transition-opacity hover:opacity-90 active:scale-95"
+    >
+      Bring back to this tab
+    </button>
+  </div>
+
   <script>
     import { notesStore } from "../lib/notesStore";
     import { searchNotes } from "../lib/searchNotes";
     import { swatchOf, rotationFor, SWATCHES, COLOR_ORDER } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
+    import { isPipSupported, isPipOpen, openPip, closePip } from "../lib/pipWindow";
     import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
@@ -732,6 +776,66 @@ import { site } from "../site.config";
         else requestAnimationFrame(tryFocus);
       };
       requestAnimationFrame(tryFocus);
+    }
+
+    // ── Document Picture-in-Picture (Phase 3) ─────────────────────────
+    // Pops the whole #app-root shell into a floating always-on-top window.
+    // Feature-gated to Chromium 116+; the button stays hidden elsewhere.
+    const pipToggle = $<HTMLButtonElement>("pip-toggle");
+    const pipIconOpen = $("pip-icon-open");
+    const pipIconClose = $("pip-icon-close");
+    const pipPlaceholder = $("pip-placeholder");
+    const pipBringBack = $<HTMLButtonElement>("pip-bring-back");
+    const appRoot = $("app-root");
+
+    function setPipUi(open: boolean): void {
+      pipIconOpen.classList.toggle("hidden", open);
+      pipIconClose.classList.toggle("hidden", !open);
+      const label = open ? "Bring back to this tab" : "Pop out into a floating window";
+      pipToggle.setAttribute("aria-label", label);
+      pipToggle.setAttribute("title", label);
+      // Placeholder uses `hidden flex-col`; add `flex` when shown (mirrors the
+      // list-empty/editor-empty toggle pattern in render()).
+      pipPlaceholder.classList.toggle("flex", open);
+    }
+
+    async function togglePip(): Promise<void> {
+      if (isPipOpen()) {
+        closePip(); // pagehide → onClose → setPipUi(false)
+        return;
+      }
+      const handle = await openPip({
+        sourceEl: appRoot,
+        placeholderEl: pipPlaceholder,
+        width: 400,
+        height: 500, // DECISION 7-A — sticky-note proportions
+        pipTitle: `📺 ${document.title}`,
+        onOpen: () => {
+          // Reparenting blurs the focused contentEditable — re-focus so the
+          // user can type immediately in the floating note.
+          if (notesStore.get().activeId) focusEditorSoon();
+        },
+        onClose: () => setPipUi(false),
+      });
+      if (!handle) {
+        // Surface the popup-blocked / rejected case as a transient notice.
+        toastMsg.textContent =
+          "Couldn't open the floating window. Allow pop-ups for this site.";
+        toastAction.textContent = "";
+        toastEl.classList.remove("hidden");
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 4000);
+        return;
+      }
+      setPipUi(true);
+    }
+
+    if (isPipSupported()) {
+      pipToggle.classList.remove("hidden");
+      pipToggle.addEventListener("click", () => void togglePip());
+      pipBringBack.addEventListener("click", () => {
+        if (isPipOpen()) closePip();
+      });
     }
 
     newBtn.addEventListener("click", () => {
