@@ -359,6 +359,29 @@ class NotesStore {
   }
 
   /**
+   * Persist a note's PiP window size (Phase 3 · commit 13). A window resize is
+   * NOT a content edit, so this deliberately does NOT bump `updatedAt` (would
+   * reorder the recency list + lose cross-tab last-write-wins races), does NOT
+   * broadcast (size is per-device, not shared content), and does NOT flip the
+   * `saving` flag (no spurious "Saved ✓" flash on drag-resize). It writes the
+   * full record quietly so the size reloads on the next pop-out of this note.
+   */
+  async updateNoteSize(id: string, pipWidth: number, pipHeight: number): Promise<void> {
+    const note = await this.load(id);
+    if (!note) return;
+    if (note.pipWidth === pipWidth && note.pipHeight === pipHeight) return; // no-op
+    const updated: Note = { ...note, pipWidth, pipHeight };
+    this.track(updated);
+    if (this.state.activeId === id) this.setState({ active: updated });
+    if (!this.adapter) return;
+    try {
+      await this.adapter.put(updated); // quiet: no broadcast, no saving flag
+    } catch (err) {
+      console.error("[notesStore] updateNoteSize persist failed:", err);
+    }
+  }
+
+  /**
    * Soft-delete with a 5s undo window (SPEC §6). Removes from the index
    * immediately; the hard delete fires after 5s unless `undoDelete()` is
    * called. Deleting a second note flushes the first pending hard-delete.

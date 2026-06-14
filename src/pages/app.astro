@@ -799,23 +799,72 @@ import { site } from "../site.config";
       pipPlaceholder.classList.toggle("flex", open);
     }
 
+    // Default PiP size (DECISION 7-A — sticky-note proportions). Per-note saved
+    // size overrides this on a per-note basis.
+    const PIP_DEFAULT_W = 400;
+    const PIP_DEFAULT_H = 500;
+    let pipResizeCleanup: (() => void) | null = null;
+
     async function togglePip(): Promise<void> {
       if (isPipOpen()) {
         closePip(); // pagehide → onClose → setPipUi(false)
         return;
       }
+      // Open at the active note's saved size if it has one, else the default.
+      const active = notesStore.get().active;
+      const width = active?.pipWidth ?? PIP_DEFAULT_W;
+      const height = active?.pipHeight ?? PIP_DEFAULT_H;
+      let pipDoc: Document | null = null; // captured in onOpen for onClose unbind
       const handle = await openPip({
         sourceEl: appRoot,
         placeholderEl: pipPlaceholder,
-        width: 400,
-        height: 500, // DECISION 7-A — sticky-note proportions
+        width,
+        height,
         pipTitle: `📺 ${document.title}`,
-        onOpen: () => {
-          // Reparenting blurs the focused contentEditable — re-focus so the
-          // user can type immediately in the floating note.
+        onOpen: (pipWindow) => {
+          pipDoc = pipWindow.document;
+          // 1) Reparenting blurs the focused contentEditable — re-focus so the
+          //    user can type immediately in the floating note.
           if (notesStore.get().activeId) focusEditorSoon();
+          // 2) Bind the keymap + outside-click onto the PiP document so all
+          //    shortcuts (N/J/K/?/Esc/Cmd+S) work INSIDE the float.
+          bindGlobalListeners(pipWindow.document);
+          // 3) Persist the window size per-note on resize (debounced). A resize
+          //    is per-device chrome, not content — updateNoteSize writes quietly
+          //    (no updatedAt bump, no broadcast, no "Saved ✓").
+          let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+          const onResize = () => {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+              const id = notesStore.get().activeId;
+              if (!id) return;
+              void notesStore.updateNoteSize(
+                id,
+                pipWindow.innerWidth,
+                pipWindow.innerHeight,
+              );
+            }, 400);
+          };
+          pipWindow.addEventListener("resize", onResize);
+          pipResizeCleanup = () => {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            pipWindow.removeEventListener("resize", onResize);
+          };
         },
-        onClose: () => setPipUi(false),
+        onClose: () => {
+          setPipUi(false);
+          // Unbind PiP-doc listeners + tear down the resize watcher. The PiP
+          // document dies on close (its listeners go with it), but we still
+          // drop it from boundDocs so the Set never holds a stale Document.
+          if (pipResizeCleanup) {
+            pipResizeCleanup();
+            pipResizeCleanup = null;
+          }
+          if (pipDoc) {
+            unbindGlobalListeners(pipDoc);
+            pipDoc = null;
+          }
+        },
       });
       if (!handle) {
         // Surface the popup-blocked / rejected case as a transient notice.
@@ -885,12 +934,14 @@ import { site } from "../site.config";
         closeColorPopover();
       }
     });
-    // Outside-click closes the popover (capture the document, ignore the button).
-    document.addEventListener("click", (e) => {
+    // Outside-click closes the popover (works in whichever document has focus —
+    // bound to both origin + PiP doc via bindGlobalListeners).
+    function onDocClick(e: MouseEvent): void {
       if (!isColorPopoverOpen()) return;
       const t = e.target as Node;
       if (!colorPopover.contains(t) && !colorBtn.contains(t)) closeColorPopover();
-    });
+    }
+    document.addEventListener("click", onDocClick);
 
     // Shortcuts modal: close via the × button or a backdrop click.
     shortcutsClose.addEventListener("click", closeShortcuts);
@@ -937,9 +988,20 @@ import { site } from "../site.config";
       void loadNoteIntoEditor(id, doc as JSONContent, true);
     });
 
-    // Keyboard map (Phase 2 subset — SPEC-Phase2 §8)
-    document.addEventListener("keydown", (e) => {
-      const el = document.activeElement as HTMLElement | null;
+    // Keyboard map (Phase 2 subset — SPEC-Phase2 §8). Named so it can be bound
+    // to BOTH the origin document AND the PiP document (a PiP window is a
+    // separate document; the origin listener never sees keys typed in the
+    // float — see bindGlobalListeners).
+    function onKeyDown(e: KeyboardEvent): void {
+      // CRITICAL: read activeElement from the event's OWN document, not the
+      // hardcoded origin `document`. When a key fires inside the PiP window the
+      // focused editor lives in the PiP doc; using origin `document` here would
+      // report `typing=false` and fire N/J/K while the user is mid-sentence.
+      const srcDoc =
+        (e.target as Node | null)?.ownerDocument ??
+        (e.view as Window | null)?.document ??
+        document;
+      const el = srcDoc.activeElement as HTMLElement | null;
       const typing =
         el &&
         (el.tagName === "INPUT" ||
@@ -1023,7 +1085,27 @@ import { site } from "../site.config";
         e.preventDefault();
         navigateList(-1);
       }
-    });
+    }
+    document.addEventListener("keydown", onKeyDown);
+
+    // Bind/unbind the global listeners onto an arbitrary document. Used to
+    // make the keymap + outside-click work INSIDE the PiP window (a separate
+    // document). The origin document keeps its own binding the whole time, so
+    // the sidebar still responds if focused there. `boundDocs` guards against
+    // double-binding the same document.
+    const boundDocs = new Set<Document>([document]);
+    function bindGlobalListeners(doc: Document): void {
+      if (boundDocs.has(doc)) return;
+      boundDocs.add(doc);
+      doc.addEventListener("keydown", onKeyDown as EventListener);
+      doc.addEventListener("click", onDocClick as EventListener);
+    }
+    function unbindGlobalListeners(doc: Document): void {
+      if (doc === document) return; // never unbind the origin
+      boundDocs.delete(doc);
+      doc.removeEventListener("keydown", onKeyDown as EventListener);
+      doc.removeEventListener("click", onDocClick as EventListener);
+    }
 
     // Flush any pending hard-delete + pending save before the tab unloads.
     window.addEventListener("pagehide", () => {

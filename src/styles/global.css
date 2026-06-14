@@ -443,3 +443,71 @@ html[data-theme="dark"] .sticky-card:hover {
   font-weight: 600;
   line-height: 1;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Document Picture-in-Picture compact layout (Phase 3 · commit 13)
+
+   Scoped to `:where(.pip-mode)` so ALL rules apply ONLY inside the floating
+   PiP document (its <html> gets the `pip-mode` class) and NEVER touch the
+   origin tab. `:where()` keeps specificity at 0 so any Tailwind utility on
+   the moved nodes still wins — these are gentle, easily-overridden defaults.
+
+   The whole #app-root moves into PiP; here we collapse it to a single-note
+   view: hide the sidebar, hide chrome that's redundant in a 400px window,
+   and let the editor fill the float.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:where(.pip-mode) body {
+  margin: 0;
+  min-height: 100%;
+}
+
+/* The app shell fills the PiP window. */
+:where(.pip-mode) #app-root {
+  height: 100dvh;
+}
+
+/* Hide the sidebar — PiP shows the single ACTIVE note, not the list. Switch
+   notes by bringing the app back to the tab. */
+:where(.pip-mode) aside {
+  display: none !important;
+}
+
+/* Hide chrome that's redundant or doesn't fit in a narrow float:
+   - the brand home link (the PiP title bar already identifies the window)
+   - the PiP toggle itself (close is in the title bar; toggling-to-close from
+     inside the float is confusing)
+   - the "On your device" reassurance text (saves horizontal space) */
+:where(.pip-mode) header > a[aria-label$="home"],
+:where(.pip-mode) #pip-toggle {
+  display: none !important;
+}
+
+/* Keep #save-status visible but let the header breathe in a tight window. */
+:where(.pip-mode) header {
+  height: 2.5rem;
+  padding-inline: 0.625rem;
+}
+
+/* The editor pane fills the remaining height; trim the comfortable desktop
+   padding so a 400px float isn't mostly margins. */
+:where(.pip-mode) main {
+  padding: 0;
+}
+
+:where(.pip-mode) #editor-host {
+  padding: 0.75rem 0.875rem;
+}
+
+/* The editor toolbar (color · pin · delete) stays — useful in the float — but
+   tightens up. */
+:where(.pip-mode) #editor-toolbar {
+  height: 2.5rem;
+  padding-inline: 0.625rem;
+}
+
+/* Defensive: the origin-tab placeholder must NEVER render inside PiP (the
+   move-out leaves it behind in origin, but belt-and-suspenders). */
+:where(.pip-mode) #pip-placeholder {
+  display: none !important;
+}
