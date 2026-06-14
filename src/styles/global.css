@@ -529,9 +529,16 @@ html[data-theme="dark"] .sticky-card:hover {
 
 /* Editor body — tinted in BOTH normal + PiP modes (Google-Keep model: the open
    note shows its color). Falls back to themed chrome when --note-bg is unset
-   (no active note / empty state). */
+   (no active note / empty state). #app-root ITSELF carries the tint as the base
+   layer so the cream fills the whole shell end-to-end — no themed-white <html>
+   or <main> base can peek through below short notes (this is what caused the
+   "white strip at the bottom of the float"). */
+#app-root[style*="--note-bg"],
+#app-root[style*="--note-bg"] main,
 #app-root[style*="--note-bg"] #editor-host {
   background-color: var(--note-bg);
+}
+#app-root[style*="--note-bg"] #editor-host {
   background-image: url("/assets/paper-noise.svg");
   background-repeat: repeat;
   background-blend-mode: multiply;

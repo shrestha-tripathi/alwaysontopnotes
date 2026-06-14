@@ -673,6 +673,12 @@ import { site } from "../site.config";
         appRoot.style.setProperty("--note-bg", sw.bg);
         appRoot.style.setProperty("--note-ink", sw.ink);
         appRoot.style.setProperty("--note-edge", sw.edge);
+        // Best-effort: point the address-bar/theme-color at the note color.
+        // NOTE: browsers do NOT let a page recolor the Document-PiP title bar
+        // (the dark padlock+URL+X strip) — that chrome is browser-owned with no
+        // styling API. This only affects the mobile address bar / PWA theme on
+        // platforms that honor it; the PiP title bar stays browser-default.
+        setThemeColor(sw.bg);
         if (isColorPopoverOpen()) syncColorPickerActive();
       } else {
         // Deselected — clear the editor's bound note so re-selecting reloads.
@@ -683,6 +689,32 @@ import { site } from "../site.config";
         appRoot.style.removeProperty("--note-bg");
         appRoot.style.removeProperty("--note-ink");
         appRoot.style.removeProperty("--note-edge");
+        resetThemeColor();
+      }
+    }
+
+    // Best-effort theme-color control. Updates a dedicated (non-media) meta so
+    // platforms that honor it (mobile address bar, installed-PWA theme) track
+    // the active note color. Does NOT affect the Document-PiP title bar — that
+    // chrome is browser-owned and has no page-side styling API.
+    let themeColorMeta: HTMLMetaElement | null = null;
+    function ensureThemeColorMeta(): HTMLMetaElement {
+      if (!themeColorMeta) {
+        themeColorMeta = document.createElement("meta");
+        themeColorMeta.setAttribute("name", "theme-color");
+        themeColorMeta.setAttribute("data-note-theme", "1");
+        document.head.appendChild(themeColorMeta);
+      }
+      return themeColorMeta;
+    }
+    function setThemeColor(color: string): void {
+      ensureThemeColorMeta().setAttribute("content", color);
+    }
+    function resetThemeColor(): void {
+      // Remove our override so the static media-gated metas in Layout win again.
+      if (themeColorMeta) {
+        themeColorMeta.remove();
+        themeColorMeta = null;
       }
     }
 

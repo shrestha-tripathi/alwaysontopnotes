@@ -40,8 +40,8 @@ export function markWelcomed(): void {
   }
 }
 
-/** The color of the welcome note — cheerful default yellow ("inbox"). */
-export const WELCOME_COLOR: StickyColor = "yellow";
+/** The color of the welcome note — soft cream ("important"), the default. */
+export const WELCOME_COLOR: StickyColor = "cream";
 
 /**
  * The welcome note's rich Tiptap document. A heading, a one-line intro, a

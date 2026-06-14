@@ -45,7 +45,7 @@ export type StickyColor =
   | "gray"
   | "cream";
 
-export const DEFAULT_COLOR: StickyColor = "yellow";
+export const DEFAULT_COLOR: StickyColor = "cream";
 
 /**
  * Runtime list of valid colors — source of truth for the `StickyColor` union
