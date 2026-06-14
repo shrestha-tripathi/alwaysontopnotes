@@ -853,6 +853,10 @@ html[data-theme="dark"] .sticky-card:hover {
      track with a rounded-pill look (the classic native-feel trick). */
   border: 2px solid transparent;
   background-clip: padding-box;
+  /* Floor the thumb height so it stays a grabbable target even on very long
+     notes — without this a tall note shrinks the thumb to an un-draggable
+     sliver (the root cause of the "can't drag the scrollbar in the float" bug). */
+  min-height: 44px;
   transition: background-color 140ms ease;
 }
 .nice-scroll::-webkit-scrollbar-thumb:hover {
@@ -882,6 +886,31 @@ html[data-theme="dark"] .sticky-card:hover {
 }
 #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:active {
   background-color: color-mix(in srgb, var(--note-ink) 55%, transparent);
+}
+
+/* In the PiP float specifically, make the scrollbar comfortably DRAGGABLE. A
+   400px-wide window invites grabbing the bar (vs the wheel/trackpad you'd use
+   in the wide two-pane app), but the 9px bar with a 2px inset border leaves
+   only ~5px of grabbable thumb — too fine to catch in a small floating window.
+   Here: a wider bar, a thinner inset (more painted thumb), and a faint visible
+   track gutter so the hit area is discoverable and click-beside still reads as
+   a scroll region. Scoped to .pip-mode so the two-pane app keeps the slim bar. */
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--color-fg) 7%, transparent);
+  border-radius: 9999px;
+}
+:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb {
+  /* 3px inset on a 14px bar → ~8px painted, comfortably grabbable thumb. */
+  border: 3px solid transparent;
+}
+/* On the tinted editor surface in PiP, the gutter follows the note ink so it
+   still belongs to the paper. */
+:where(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--note-ink) 9%, transparent);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
