@@ -349,6 +349,7 @@ import { site } from "../site.config";
     import { swatchOf, rotationFor, SWATCHES, COLOR_ORDER } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
     import { isPipSupported, isPipOpen, openPip, closePip } from "../lib/pipWindow";
+    import { initPipTour } from "../lib/pipTour";
     import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
@@ -930,6 +931,10 @@ import { site } from "../site.config";
       pipBringBack.addEventListener("click", () => {
         if (isPipOpen()) closePip();
       });
+      // First-run pointer at the (now-visible) PiP button. Self-gates on the
+      // localStorage sticky bit + a ~2.8s delay so it never fights the welcome
+      // note. No-ops for returning users / unsupported browsers.
+      initPipTour();
     }
 
     newBtn.addEventListener("click", () => {

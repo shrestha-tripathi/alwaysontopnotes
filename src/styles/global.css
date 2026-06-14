@@ -630,3 +630,122 @@ html[data-theme="dark"] .sticky-card:hover {
 :where(.pip-mode) #app-root[style*="--note-bg"] {
   background-color: var(--note-bg);
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * PiP onboarding pointer (commit 14) — one-step spotlight + popover that
+ * fires once on first Chromium visit, pointing at #pip-toggle. Class
+ * names namespaced `aotn-pip-tour-*`; DOM built + gated in src/lib/pipTour.ts
+ * (localStorage `aotn:pip-tour-seen-v1`). Pure CSS spotlight via a small
+ * accent ring + giant outset shadow (the "hole" trick) — no SVG mask.
+ * ─────────────────────────────────────────────────────────────────────── */
+@keyframes aotn-pip-tour-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aotn-pip-tour-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.aotn-pip-tour-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 70;
+  animation: aotn-pip-tour-fade-in 200ms ease-out both;
+  cursor: pointer; /* signals "click to dismiss" */
+}
+
+.aotn-pip-tour-spotlight {
+  position: fixed;
+  z-index: 71;
+  border-radius: 8px;
+  pointer-events: none;
+  /* Small accent ring + giant outset shadow creating a hole over the button. */
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--color-accent) 70%, transparent),
+    0 0 0 9999px rgba(0, 0, 0, 0.55);
+  transition: top 180ms ease, left 180ms ease, width 180ms ease, height 180ms ease;
+}
+
+.aotn-pip-tour-popover {
+  position: fixed;
+  z-index: 72;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1rem 1.125rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.12);
+  animation: aotn-pip-tour-pop-in 220ms ease-out both;
+  transition: top 180ms ease, left 180ms ease;
+  font-size: 0.875rem;
+}
+
+.aotn-pip-tour-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0 0 0.375rem 0;
+  color: var(--color-fg);
+}
+
+.aotn-pip-tour-body {
+  margin: 0 0 0.875rem 0;
+  color: var(--color-fg-muted);
+  line-height: 1.45;
+}
+
+.aotn-pip-tour-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.aotn-pip-tour-got-it {
+  height: 34px;
+  padding: 0 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #1c1917;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+.aotn-pip-tour-got-it:hover { opacity: 0.9; }
+
+.aotn-pip-tour-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.aotn-pip-tour-close:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-fg);
+}
+
+.aotn-pip-tour-backdrop.aotn-pip-tour-leaving,
+.aotn-pip-tour-popover.aotn-pip-tour-leaving {
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aotn-pip-tour-backdrop,
+  .aotn-pip-tour-popover { animation: none !important; }
+  .aotn-pip-tour-spotlight { transition: none !important; }
+}
+
+@media (max-width: 420px) {
+  .aotn-pip-tour-popover {
+    width: calc(100vw - 24px) !important;
+    left: 12px !important;
+  }
+}
