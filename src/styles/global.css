@@ -804,13 +804,28 @@ html[data-theme="dark"] .sticky-card:hover {
   border-radius: 6px;
 }
 
-/* Reduced-motion: kill the title slide (JS sets an inline transition; this
-   wins via !important so the swap is instant for users who opt out). */
-@media (prefers-reduced-motion: reduce) {
-  #pip-title {
-    transition: none !important;
-  }
+/* 3D flip-board housing. The title sits in a faint recessed "well" so the
+   split-flap fold reads as a tile housed in the strip, not floating text.
+   preserve-3d keeps the rotateX fold from flattening; the inset shadow is the
+   housing. Theme-/tint-aware: on a tinted PiP header it uses the note edge. */
+:where(.pip-mode) #pip-title-clip {
+  perspective: 320px;
+  border-radius: 6px;
 }
+:where(.pip-mode) #pip-title,
+:where(.pip-mode) #pip-pos {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-title-clip {
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--note-ink) 14%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, #fff 22%, transparent);
+}
+
+/* Reduced-motion for the switcher is handled in JS (flip3d collapses the flip
+   to an instant text swap) — the flip is a Web Animation, not a CSS transition,
+   so there's nothing to override here. */
 
 /* ─────────────────────────────────────────────────────────────────────
  * Native-notes scrollbars (.nice-scroll). The default OS scrollbar (chunky,
