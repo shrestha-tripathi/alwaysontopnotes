@@ -352,7 +352,7 @@ import { site } from "../site.config";
 
     deleteBtn.addEventListener("click", () => {
       const id = notesStore.get().activeId;
-      if (id) notesStore.deleteNote(id);
+      if (id) void notesStore.deleteNote(id);
     });
 
     toastAction.addEventListener("click", () => {

@@ -2,18 +2,29 @@
  * notesStore — the reactive single source of truth for /app.
  *
  * The UI (sidebar + editor) subscribes to `change` and re-renders. Every
- * mutation is OPTIMISTIC: we update the in-memory state and emit IMMEDIATELY,
- * then persist through the StorageAdapter in the background (UX-CHARTER: no
- * spinners, instant feedback). Persistence failures surface a toast but never
- * block the UI.
+ * mutation is OPTIMISTIC: we update in-memory state and emit IMMEDIATELY, then
+ * persist through the StorageAdapter in the background (UX-CHARTER: no spinners,
+ * instant feedback). Persistence failures surface a toast but never block UI.
  *
- * The store is deliberately storage-agnostic — it holds a `StorageAdapter`
- * given at `init()` and never knows whether that's memory / IndexedDB / OPFS.
+ * Storage-agnostic — holds a `StorageAdapter` from `init()` and never knows if
+ * that's memory / IndexedDB / OPFS.
  *
- * Phase 2 scope note: this file owns CRUD + selection + search query + a soft
- * 5s delete-undo (commit 11 polishes the toast; the mechanism lives here). It
- * does NOT own cross-tab sync (commit 9 adds crossTabSync.ts which calls into
- * the public mutators) or the editor (commit 8).
+ * ── Memory model (commit 7) ──────────────────────────────────────────────
+ * Two in-memory maps mirror the adapter's two-store split, so boot is cheap
+ * even with thousands of notes:
+ *
+ *   indexMap : Map<id, NoteIndexEntry>  — LIGHT. Complete. The list's truth.
+ *                                          Loaded fully on init (cheap: title +
+ *                                          preview only, no Tiptap docs).
+ *   docCache : Map<id, Note>            — HEAVY. Sparse. Full docs, lazy-loaded
+ *                                          from the adapter on select / mutate,
+ *                                          and held for the session.
+ *
+ * Listing never needs a full doc; editing one note loads exactly one doc.
+ *
+ * Phase 2 scope: owns CRUD + selection + search query + soft 5s delete-undo
+ * (commit 11 polishes the toast). Does NOT own cross-tab sync (commit 9) or the
+ * Tiptap editor (commit 8).
  */
 import { Emitter } from "./emitter";
 import {
@@ -65,7 +76,10 @@ class NotesStore {
   }>();
 
   private adapter: StorageAdapter | null = null;
-  private notes = new Map<string, Note>(); // hot cache of full notes
+  /** LIGHT, complete — the sidebar list's source of truth. */
+  private indexMap = new Map<string, NoteIndexEntry>();
+  /** HEAVY, sparse — full docs lazily loaded on demand and cached. */
+  private docCache = new Map<string, Note>();
   private pending: PendingDelete | null = null;
 
   private state: NotesState = {
@@ -91,10 +105,23 @@ class NotesStore {
     this.emit();
   }
 
-  /** Recompute the sorted sidebar index from the hot cache. */
+  /** Recompute the sorted sidebar index from the LIGHT index map. */
   private reindex(): NoteIndexEntry[] {
-    const index = [...this.notes.values()].map(toIndexEntry).sort(compareForList);
-    return index;
+    return [...this.indexMap.values()].sort(compareForList);
+  }
+
+  /**
+   * Record a note into both in-memory tiers (light index + heavy cache).
+   * Single place that keeps the two maps consistent on every mutation.
+   */
+  private track(note: Note): void {
+    this.docCache.set(note.id, note);
+    this.indexMap.set(note.id, toIndexEntry(note));
+  }
+
+  private untrack(id: string): void {
+    this.docCache.delete(id);
+    this.indexMap.delete(id);
   }
 
   // ── lifecycle ───────────────────────────────────────────────────────
@@ -102,13 +129,12 @@ class NotesStore {
   async init(adapter: StorageAdapter): Promise<void> {
     this.adapter = adapter;
     await adapter.recover();
+    // Load ONLY the light index — no full docs. This is the whole point of the
+    // two-store design: boot cost is O(note count) in light entries, not in
+    // deserialized Tiptap documents.
     const list = await adapter.list();
-    // Warm the hot cache. (Memory adapter is tiny; IDB commit 7 will lazy-load
-    // full docs on select instead of eagerly — interface already supports it.)
-    for (const entry of list) {
-      const full = await adapter.get(entry.id);
-      if (full) this.notes.set(full.id, full);
-    }
+    this.indexMap.clear();
+    for (const entry of list) this.indexMap.set(entry.id, entry);
     this.setState({ index: this.reindex(), ready: true });
   }
 
@@ -129,6 +155,16 @@ class NotesStore {
     }
   }
 
+  /** Resolve a full note: cache hit, else lazy-load from the adapter. */
+  private async load(id: string): Promise<Note | null> {
+    const cached = this.docCache.get(id);
+    if (cached) return cached;
+    if (!this.adapter) return null;
+    const full = await this.adapter.get(id);
+    if (full) this.docCache.set(id, full);
+    return full;
+  }
+
   // ── mutations (all optimistic) ──────────────────────────────────────
 
   /** Create a blank note, select it, persist in the background. */
@@ -145,7 +181,7 @@ class NotesStore {
       createdAt: ts,
       updatedAt: ts,
     };
-    this.notes.set(note.id, note);
+    this.track(note);
     this.setState({
       index: this.reindex(),
       activeId: note.id,
@@ -155,17 +191,15 @@ class NotesStore {
     return note.id;
   }
 
-  /** Select a note (loads full doc from cache; lazy from adapter if missing). */
+  /** Select a note (lazy-loads its full doc from cache or adapter). */
   async selectNote(id: string | null): Promise<void> {
     if (id === null) {
       this.setState({ activeId: null, active: null });
       return;
     }
-    let note = this.notes.get(id) ?? null;
-    if (!note && this.adapter) {
-      note = await this.adapter.get(id);
-      if (note) this.notes.set(id, note);
-    }
+    const note = await this.load(id);
+    // Guard against a race where the note was deleted while loading.
+    if (!this.indexMap.has(id)) return;
     this.setState({ activeId: id, active: note });
   }
 
@@ -175,18 +209,14 @@ class NotesStore {
    * funnel through the same derive-and-persist core.
    */
   async updateActiveText(text: string): Promise<void> {
-    const cur = this.state.active;
-    if (!cur) return;
-    const doc = textToDoc(text);
-    await this.writeActive({ doc, plainText: text });
+    if (!this.state.active) return;
+    await this.writeActive({ doc: textToDoc(text), plainText: text });
   }
 
   /** Update the active note's doc directly (Tiptap path, commit 8). */
   async updateActiveDoc(doc: Note["doc"]): Promise<void> {
-    const cur = this.state.active;
-    if (!cur) return;
-    const plainText = docToText(doc);
-    await this.writeActive({ doc, plainText });
+    if (!this.state.active) return;
+    await this.writeActive({ doc, plainText: docToText(doc) });
   }
 
   /** Shared core: apply doc/plainText to the active note, derive, persist. */
@@ -200,17 +230,17 @@ class NotesStore {
       title: deriveTitle(patch.plainText),
       updatedAt: now(),
     };
-    this.notes.set(updated.id, updated);
+    this.track(updated);
     this.setState({ active: updated, index: this.reindex() });
     void this.persist(updated);
   }
 
-  /** Change a note's color. */
+  /** Change a note's color. (Lazy-loads the full doc if not cached.) */
   async setColor(id: string, color: StickyColor): Promise<void> {
-    const note = this.notes.get(id);
+    const note = await this.load(id);
     if (!note) return;
     const updated: Note = { ...note, color, updatedAt: now() };
-    this.notes.set(id, updated);
+    this.track(updated);
     this.setState({
       index: this.reindex(),
       active: this.state.activeId === id ? updated : this.state.active,
@@ -218,12 +248,12 @@ class NotesStore {
     void this.persist(updated);
   }
 
-  /** Toggle pinned. */
+  /** Toggle pinned. (Lazy-loads the full doc if not cached.) */
   async togglePin(id: string): Promise<void> {
-    const note = this.notes.get(id);
+    const note = await this.load(id);
     if (!note) return;
     const updated: Note = { ...note, pinned: !note.pinned, updatedAt: now() };
-    this.notes.set(id, updated);
+    this.track(updated);
     this.setState({
       index: this.reindex(),
       active: this.state.activeId === id ? updated : this.state.active,
@@ -235,29 +265,43 @@ class NotesStore {
    * Soft-delete with a 5s undo window (SPEC §6). Removes from the index
    * immediately; the hard delete fires after 5s unless `undoDelete()` is
    * called. Deleting a second note flushes the first pending hard-delete.
+   *
+   * Synchronous on the common path: delete only targets the ACTIVE note, which
+   * is always in the doc cache (loaded on select), so the optimistic UI update
+   * fires instantly with no await. The async branch is a defensive fallback for
+   * a note that somehow isn't cached (no UI path triggers it in Phase 2).
    */
   deleteNote(id: string): void {
-    const note = this.notes.get(id);
-    if (!note) return;
+    const cached = this.docCache.get(id);
+    if (cached) {
+      this.commitDelete(cached);
+    } else if (this.indexMap.has(id)) {
+      // Rare: full doc not cached — load it (for the undo stash) then delete.
+      void this.load(id).then((n) => {
+        if (n) this.commitDelete(n);
+      });
+    }
+  }
 
+  /** Shared delete core: optimistic removal + 5s undo timer + toast event. */
+  private commitDelete(note: Note): void {
     // Flush any prior pending delete first (one-at-a-time).
     this.flushPendingDelete();
 
-    this.notes.delete(id);
-    const nextActiveId =
-      this.state.activeId === id ? null : this.state.activeId;
+    this.untrack(note.id);
+    const stillActive = this.state.activeId === note.id;
     this.setState({
       index: this.reindex(),
-      activeId: nextActiveId,
-      active: nextActiveId ? this.state.active : null,
+      activeId: stillActive ? null : this.state.activeId,
+      active: stillActive ? null : this.state.active,
     });
 
     const timer = setTimeout(() => {
       this.pending = null;
-      if (this.adapter) void this.adapter.remove(id);
+      if (this.adapter) void this.adapter.remove(note.id);
     }, 5000);
     this.pending = { note, timer };
-    this.emitter.emit("pendingDelete", { id, title: note.title });
+    this.emitter.emit("pendingDelete", { id: note.id, title: note.title });
   }
 
   /** Restore the most recently soft-deleted note. */
@@ -266,7 +310,7 @@ class NotesStore {
     clearTimeout(this.pending.timer);
     const { note } = this.pending;
     this.pending = null;
-    this.notes.set(note.id, note);
+    this.track(note);
     this.setState({ index: this.reindex() });
     void this.persist(note);
   }

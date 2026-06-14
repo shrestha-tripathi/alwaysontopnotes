@@ -47,6 +47,27 @@ export type StickyColor =
 
 export const DEFAULT_COLOR: StickyColor = "yellow";
 
+/**
+ * Runtime list of valid colors — source of truth for the `StickyColor` union
+ * at runtime (the type itself erases at compile time). Kept here in the schema
+ * module so persistence-layer validation has a canonical reference.
+ */
+export const STICKY_COLORS: readonly StickyColor[] = [
+  "yellow",
+  "pink",
+  "blue",
+  "green",
+  "orange",
+  "purple",
+  "gray",
+  "cream",
+];
+
+/** Type guard: is an arbitrary value one of the known sticky colors? */
+export function isStickyColor(v: unknown): v is StickyColor {
+  return typeof v === "string" && (STICKY_COLORS as readonly string[]).includes(v);
+}
+
 /** A full note, including its rich-text document. Loaded lazily on select. */
 export interface Note {
   /** Stable id; `crypto.randomUUID()`. Never reused, never changes. */
