@@ -511,3 +511,71 @@ html[data-theme="dark"] .sticky-card:hover {
 :where(.pip-mode) #pip-placeholder {
   display: none !important;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Note-color surface (fix · "make the editor + PiP read as a native sticky")
+
+   The note's literal swatch is driven onto #app-root as --note-bg / --note-ink
+   / --note-edge by the island (render()). Here we paint the editor surface
+   (both modes) and, inside PiP, the chrome — so picking a color is actually
+   visible on the writing surface, and the float looks like one solid sticky.
+
+   Legibility rule (DESIGN.md): swatches are LITERAL hex, identical in light +
+   dark. So text on a tinted surface MUST use --note-ink (near-black), never the
+   theme --color-fg, or dark-mode text goes white-on-pastel and vanishes. Same
+   rule the <mark> highlight follows. Paper texture + multiply blend carry over
+   so it genuinely reads as paper, not a flat color block.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Editor body — tinted in BOTH normal + PiP modes (Google-Keep model: the open
+   note shows its color). Falls back to themed chrome when --note-bg is unset
+   (no active note / empty state). */
+#app-root[style*="--note-bg"] #editor-host {
+  background-color: var(--note-bg);
+  background-image: url("/assets/paper-noise.svg");
+  background-repeat: repeat;
+  background-blend-mode: multiply;
+}
+#app-root[style*="--note-bg"] #editor-host .aotn-prose,
+#app-root[style*="--note-bg"] #editor-host .aotn-prose p,
+#app-root[style*="--note-bg"] #editor-host .aotn-prose h1,
+#app-root[style*="--note-bg"] #editor-host .aotn-prose h2,
+#app-root[style*="--note-bg"] #editor-host .aotn-prose h3,
+#app-root[style*="--note-bg"] #editor-host .aotn-prose li {
+  color: var(--note-ink);
+}
+/* Caret + muted marks need to read on the pastel too. */
+#app-root[style*="--note-bg"] #editor-host .aotn-prose {
+  caret-color: var(--note-ink);
+}
+#app-root[style*="--note-bg"] #editor-host .aotn-prose blockquote {
+  border-left-color: var(--note-edge);
+  color: var(--note-ink);
+  opacity: 0.85;
+}
+/* The editor toolbar (color · pin · delete) shares the note color so the top
+   strip doesn't float as a gray band above a colored body. */
+#app-root[style*="--note-bg"] #editor-toolbar {
+  background-color: var(--note-bg);
+  border-bottom-color: var(--note-edge);
+}
+#app-root[style*="--note-bg"] #editor-toolbar button {
+  color: color-mix(in srgb, var(--note-ink) 78%, transparent);
+}
+#app-root[style*="--note-bg"] #editor-toolbar button:hover {
+  color: var(--note-ink);
+  background-color: color-mix(in srgb, var(--note-edge) 55%, transparent);
+}
+
+/* ── PiP-only: paint the GLOBAL header too, so the ENTIRE float is one solid
+   sticky note. In the normal two-pane app the header stays themed (a colored
+   app-bar next to a gray sidebar would look broken) — but in PiP the brand is
+   hidden and the sidebar is gone, so coloring the header completes the
+   native-sticky illusion. */
+:where(.pip-mode) #app-root[style*="--note-bg"] header {
+  background-color: var(--note-bg);
+  border-bottom-color: var(--note-edge);
+}
+:where(.pip-mode) #app-root[style*="--note-bg"] #save-status {
+  color: color-mix(in srgb, var(--note-ink) 70%, transparent);
+}

@@ -663,13 +663,26 @@ import { site } from "../site.config";
         pinBtn.title = state.active.pinned ? "Unpin note" : "Pin note";
         // Reflect the active note's color on the toolbar dot + keep an open
         // picker's active ring in sync (e.g. when a sibling tab recolors it).
-        colorBtnDot.style.background = swatchOf(state.active.color).bg;
+        const sw = swatchOf(state.active.color);
+        colorBtnDot.style.background = sw.bg;
+        // Drive the note's swatch onto the whole shell so the editor surface
+        // (and, in PiP, the chrome) paints the literal note color — making the
+        // float read as a native sticky. Text uses the swatch INK (near-black,
+        // identical in light+dark) not the theme fg, else dark-mode text would
+        // go white-on-pastel and vanish (same rule as the <mark> highlight).
+        appRoot.style.setProperty("--note-bg", sw.bg);
+        appRoot.style.setProperty("--note-ink", sw.ink);
+        appRoot.style.setProperty("--note-edge", sw.edge);
         if (isColorPopoverOpen()) syncColorPickerActive();
       } else {
         // Deselected — clear the editor's bound note so re-selecting reloads.
         editorNoteId = null;
         bubbleEl.style.visibility = "hidden";
         closeColorPopover();
+        // Drop the note-color custom props so the empty state shows theme chrome.
+        appRoot.style.removeProperty("--note-bg");
+        appRoot.style.removeProperty("--note-ink");
+        appRoot.style.removeProperty("--note-edge");
       }
     }
 
