@@ -529,11 +529,15 @@ html[data-theme="dark"] .sticky-card:hover {
 
 /* Editor body — tinted in BOTH normal + PiP modes (Google-Keep model: the open
    note shows its color). Falls back to themed chrome when --note-bg is unset
-   (no active note / empty state). #app-root ITSELF carries the tint as the base
-   layer so the cream fills the whole shell end-to-end — no themed-white <html>
-   or <main> base can peek through below short notes (this is what caused the
-   "white strip at the bottom of the float"). */
-#app-root[style*="--note-bg"],
+   (no active note / empty state).
+
+   ⚠️ Tint ONLY <main> + #editor-host here — NEVER #app-root itself in normal
+   mode. #app-root is the flex container that ALSO wraps <aside> (the sidebar),
+   so painting it bleeds the note color across the sidebar (regression caught in
+   field test — the green "flowed into" the notes list). <main> is opaque and
+   flex-1, so its tint already fills the whole right pane top-to-bottom; no white
+   strip in the two-pane app. The #app-root base-layer tint (for the PiP white-
+   strip fix) is scoped to .pip-mode ONLY — see the PiP block below. */
 #app-root[style*="--note-bg"] main,
 #app-root[style*="--note-bg"] #editor-host {
   background-color: var(--note-bg);
@@ -585,4 +589,14 @@ html[data-theme="dark"] .sticky-card:hover {
 }
 :where(.pip-mode) #app-root[style*="--note-bg"] #save-status {
   color: color-mix(in srgb, var(--note-ink) 70%, transparent);
+}
+
+/* ── PiP-only: #app-root ITSELF carries the tint as the base layer so the note
+   color fills the whole float end-to-end — no themed-white <html> or <main>
+   base can peek through below a short note (this was the "white strip at the
+   bottom of the float"). Scoped to .pip-mode because in the two-pane app
+   #app-root also wraps the sidebar (tinting it bleeds color into <aside>). In
+   PiP the sidebar is display:none, so the whole shell is safe to paint. */
+:where(.pip-mode) #app-root[style*="--note-bg"] {
+  background-color: var(--note-bg);
 }
