@@ -8,9 +8,11 @@ Follow these rules on every change.
 - **Astro 6** (MPA, SEO-first static output) + **TypeScript strict**
 - **Tailwind CSS v4** (zero-config, `@theme` in `src/styles/global.css`)
 - **Cloudflare Pages** deploy target (static, auto from `main` push)
-- **Tiptap v2** editor + extensions (Phase 2+)
+- **Tiptap v3** editor + extensions (Phase 2+, vanilla `@tiptap/core` — NO React)
 - **Document Picture-in-Picture API** for floating window (Phase 3)
-- **OPFS** for note storage (Phase 2+)
+- **IndexedDB** (via `idb`) for note storage — primary, behind a `StorageAdapter`
+  interface so OPFS / sqlite-wasm can be dropped in later without touching the
+  store. (Decision recorded in `specs/SPEC-Phase2.md` §0.)
 - **BroadcastChannel** for cross-tab sync (Phase 2+)
 - Node `>=22.12.0`, npm
 
