@@ -82,6 +82,22 @@ import { site } from "../site.config";
         >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
         </button>
+        {/* Stack switcher toggle — opens the 3D deck to jump to ANY note fast.
+            Shown only in PiP (the two-pane app has the full sidebar list). */}
+        <button
+          id="pip-stack-toggle"
+          type="button"
+          class="ml-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+          aria-label="Browse all notes"
+          title="Browse all notes (stack)"
+          aria-expanded="false"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="3" width="16" height="5" rx="1.5"></rect>
+            <rect x="6" y="10" width="12" height="4" rx="1.5" opacity="0.7"></rect>
+            <rect x="8" y="16" width="8" height="4" rx="1.5" opacity="0.45"></rect>
+          </svg>
+        </button>
       </div>
       <div class="flex items-center gap-3">
         {/* Save status — wired in commit 8; placeholder reserved now */}
@@ -348,6 +364,11 @@ import { site } from "../site.config";
           </div>
         </div>
       </main>
+
+      {/* PiP 3D stack switcher host. Inside #app-root so it travels into the
+          float; shown only in .pip-mode + when JS adds .is-open. Contents are
+          built by pipStack.ts. */}
+      <div id="pip-stack" class="hidden"></div>
     </div>
 
     {/* Hidden file input for "Import .md" (picker path). The drag-drop overlay
@@ -505,6 +526,7 @@ import { site } from "../site.config";
     import { importMarkdownFiles } from "../lib/importNotes";
     import { initPwaInstall } from "../lib/pwaInstall";
     import { initThemeToggle } from "../lib/themeToggle";
+    import { initPipStack } from "../lib/pipStack";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
@@ -1240,6 +1262,9 @@ import { site } from "../site.config";
         },
         onClose: () => {
           setPipUi(false);
+          // Close the stack switcher if it was left open — it's a PiP-only
+          // surface and shouldn't linger when the app returns to the tab.
+          pipStack.close();
           // Unbind PiP-doc listeners + tear down the resize watcher. The PiP
           // document dies on close (its listeners go with it), but we still
           // drop it from boundDocs so the Set never holds a stale Document.
@@ -1296,6 +1321,27 @@ import { site } from "../site.config";
         system: document.getElementById("theme-icon-system"),
       },
       pipWindowRef,
+    });
+
+    // PiP 3D stack switcher. A richer note picker for the float (the sidebar is
+    // hidden there): a vertical 3D deck you flick through (wheel / ↑↓ / J K) and
+    // tap to jump to ANY note. Selecting routes through selectNote + refocuses
+    // the editor, same as navigateList. The host lives inside #app-root so it
+    // travels into PiP; it's inert in the two-pane app (hidden via .pip-mode CSS).
+    const pipStack = initPipStack({
+      host: $("pip-stack"),
+      toggleBtn: $("pip-stack-toggle"),
+      getVisible: () => {
+        const s = notesStore.get();
+        return searchNotes(s.index, s.query);
+      },
+      getActiveId: () => notesStore.get().activeId,
+      swatchOf,
+      rotationFor,
+      onSelect: (id) => {
+        void notesStore.selectNote(id);
+        focusEditorSoon();
+      },
     });
 
     // In-PiP note switcher buttons. Prev = K = up (-1), Next = J = down (+1) —
@@ -1607,10 +1653,10 @@ import { site } from "../site.config";
         e.preventDefault();
         searchEl.focus();
         searchEl.select();
-      } else if (e.key === "j" || e.key === "J") {
+      } else if (e.key === "j" || e.key === "J" || e.key === "ArrowDown") {
         e.preventDefault();
         navigateList(1);
-      } else if (e.key === "k" || e.key === "K") {
+      } else if (e.key === "k" || e.key === "K" || e.key === "ArrowUp") {
         e.preventDefault();
         navigateList(-1);
       }

@@ -1008,3 +1008,151 @@ html[data-theme="dark"] .sticky-card:hover {
     animation: none !important;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   PiP 3D stack switcher (PiP-only). A vertical deck of sticky-note cards you
+   flick through to jump to any note in the float. Built by pipStack.ts.
+
+   ⚠️ 3D-trap (commit-14 lesson): overflow:hidden / truncate FLATTENS 3D
+   transforms. The transformed element (.pip-stack-card) MUST keep overflow
+   visible; the title/preview truncation lives on INNER spans only.
+
+   Visible ONLY in the float (:where(.pip-mode)) AND when JS adds .is-open —
+   inert in the two-pane app, which has the full sidebar list.
+   ────────────────────────────────────────────────────────────────────────── */
+#pip-stack {
+  display: none;
+}
+:where(.pip-mode) #pip-stack.is-open {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+}
+.pip-stack-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+/* The deck is a centred 3D scene; perspective gives the cards real depth. */
+.pip-stack-deck {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  perspective: 900px;
+  perspective-origin: 50% 50%;
+  /* The cards are absolutely stacked at centre and pushed out by transform, so
+     the flex centring just anchors the origin. */
+}
+/* OUTER card — owns the 3D transform. overflow VISIBLE (never clip a 3D node).
+   Positioned absolutely so siblings stack; transform composes the depth band. */
+.pip-stack-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(78%, 300px);
+  min-height: 76px;
+  margin: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid var(--sw-edge);
+  background: var(--sw-bg);
+  color: var(--sw-ink);
+  cursor: pointer;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.22),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+  /* Depth math: each step from focus recedes (down the Z), drops vertically,
+     tips back (rotateX), shrinks, and fades. --offset is signed; --abs is |off|.
+     The focused card (offset 0) sits upright + front + full opacity. */
+  --step-y: 58px;
+  --step-z: -90px;
+  --step-rot: 9deg;
+  --step-scale: 0.08;
+  transform:
+    translate(-50%, -50%)
+    translateY(calc(var(--offset) * var(--step-y)))
+    translateZ(calc(var(--abs) * var(--step-z)))
+    rotateX(calc(var(--offset) * var(--step-rot) * -1))
+    scale(calc(1 - var(--abs) * var(--step-scale)))
+    rotate(calc(var(--rot) * 0.25));
+  transform-style: preserve-3d;
+  opacity: calc(1 - var(--abs) * 0.22);
+  z-index: calc(50 - var(--abs));
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease;
+}
+.pip-stack-card[data-offset="0"] {
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.3),
+    0 4px 10px rgba(0, 0, 0, 0.16);
+  outline: 2px solid color-mix(in srgb, var(--sw-ink) 55%, transparent);
+  outline-offset: 2px;
+}
+/* INNER spans — these carry the truncation (overflow hidden) so the clip never
+   lands on the 3D-transformed card and flattens it. */
+.pip-stack-card-title {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pip-stack-card-preview {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.72;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pip-stack-empty {
+  color: var(--color-fg-muted);
+  font-size: 14px;
+}
+.pip-stack-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+/* Reduced motion → flat scrollable list, no 3D depth/animation. Collapse the
+   transform to a simple vertical offset and let the deck scroll if it overflows
+   (the focused card stays outlined for orientation). */
+@media (prefers-reduced-motion: reduce) {
+  .pip-stack-deck {
+    perspective: none;
+    justify-content: flex-start;
+    padding: 16px 0;
+    overflow-y: auto;
+  }
+  .pip-stack-card {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    opacity: 1;
+    margin: 5px 0;
+    transition: none;
+  }
+}
