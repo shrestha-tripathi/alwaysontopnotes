@@ -1,0 +1,504 @@
+---
+/**
+ * Full ComparisonTable — the deep, 12+ row table for the dedicated /compare page.
+ *
+ * Strategy:
+ *   - Brutally honest: shows where competitors do beat us (cross-device sync)
+ *   - Each row links a feature → a real benefit, not buzzwords
+ *   - Mobile-first: collapses to per-feature cards on narrow screens
+ *   - Sticky column headers on desktop so users can scroll without losing context
+ *
+ * Used on /compare only. Homepage uses ComparisonTeaser (3 rows).
+ */
+
+type Verdict = boolean | "maybe";
+
+interface ComparisonRow {
+  feature: string;
+  why: string;
+  others: Verdict[];
+  us: boolean;
+  category: keyof typeof categoryColors;
+  note?: string;
+  notes?: (string | null)[];
+}
+
+const competitors = [
+  { name: "Windows\nSticky Notes", short: "Win Sticky", id: "winsticky" },
+  { name: "macOS\nStickies", short: "macOS", id: "macsticky" },
+  { name: "Apple Notes", short: "Apple", id: "applenotes" },
+  { name: "Google Keep", short: "Keep", id: "keep" },
+];
+
+// Sticky-note color icons for the visual category band on each row.
+const categoryColors = {
+  core: { label: "Core differentiator", bg: "#fde047" },
+  privacy: { label: "Privacy", bg: "#bae6fd" },
+  trust: { label: "Trust", bg: "#bbf7d0" },
+  features: { label: "Features", bg: "#fbcfe8" },
+} as const;
+
+// Each row: feature description + boolean answers per competitor + AOTN.
+// 'maybe' = partial / with caveats (shown as dash icon with hover tooltip).
+const rows: ComparisonRow[] = [
+  {
+    feature: "Floats over fullscreen apps (Zoom, video, Excel)",
+    why: "The killer use case — notes that stay visible during meetings or full-screen video",
+    others: [false, false, false, false],
+    us: true,
+    category: "core",
+  },
+  {
+    feature: "Works on Windows AND Mac AND Linux",
+    why: "Same notes follow you across every device, not locked to one OS",
+    others: [false, false, false, true],
+    us: true,
+    category: "core",
+  },
+  {
+    feature: "Works on Chromebook",
+    why: "Real cross-platform — students and budget users included",
+    others: [false, false, false, true],
+    us: true,
+    category: "core",
+  },
+  {
+    feature: "Notes never uploaded to any server",
+    why: "True privacy: your text never leaves your device",
+    others: [true, true, false, false],
+    us: true,
+    category: "privacy",
+  },
+  {
+    feature: "Cross-device sync available",
+    why: "Cloud syncs across devices, at the cost of upload (we're honest)",
+    others: [true, true, true, true],
+    us: false,
+    category: "privacy",
+    note: "On the roadmap — opt-in end-to-end encrypted sync coming",
+  },
+  {
+    feature: "Open source (auditable code)",
+    why: "Verify privacy claims yourself, fork it, self-host it",
+    others: [false, false, false, false],
+    us: true,
+    category: "trust",
+  },
+  {
+    feature: "Free forever, no premium tier",
+    why: "No upsell, no \"pro version\", no ads — full features for everyone",
+    others: [true, true, "maybe", true],
+    us: true,
+    category: "trust",
+    notes: [null, null, "Free with limits — 5GB iCloud free tier", null],
+  },
+  {
+    feature: "No account or signup required",
+    why: "Open the URL, start typing — zero friction",
+    others: [true, true, false, false],
+    us: true,
+    category: "trust",
+  },
+  {
+    feature: "Rich text + markdown editing",
+    why: "Headings, lists, checkboxes, code blocks, links — Notion-grade editor",
+    others: [false, true, true, "maybe"],
+    us: true,
+    category: "features",
+    notes: [null, null, null, "Basic formatting only — no code blocks"],
+  },
+  {
+    feature: "Keyboard-first (Cmd+K palette, vim nav)",
+    why: "Power users never touch the mouse",
+    others: [false, false, "maybe", false],
+    us: true,
+    category: "features",
+    notes: [null, null, "Some shortcuts but no palette", null],
+  },
+  {
+    feature: "Export all notes as markdown",
+    why: "Your data is portable forever — outlives any OS install",
+    others: [false, false, "maybe", "maybe"],
+    us: true,
+    category: "features",
+    notes: [null, null, "Export to PDF only", "Export per-note only"],
+  },
+  {
+    feature: "Works offline (no internet needed)",
+    why: "Reliable in airplane mode, on slow Wi-Fi, in a basement",
+    others: [true, true, "maybe", "maybe"],
+    us: true,
+    category: "features",
+    notes: [null, null, "Cached only — first sync needs internet", "Cached only — first sync needs internet"],
+  },
+  {
+    feature: "Per-note color tagging (8 colors)",
+    why: "Visual taxonomy without folders — sticky-note vibes",
+    others: ["maybe", true, true, true],
+    us: true,
+    category: "features",
+    notes: ["3 colors only", null, null, null],
+  },
+  {
+    feature: "Installable as Progressive Web App",
+    why: "Standalone window, taskbar icon, no browser chrome",
+    others: ["maybe", "maybe", false, false],
+    us: true,
+    category: "features",
+    notes: ["It's a native app, but Windows-only", "It's a native app, but Mac-only", null, null],
+  },
+  {
+    feature: "Self-hostable (run on your own server)",
+    why: "Complete autonomy — your domain, your infrastructure, your rules",
+    others: [false, false, false, false],
+    us: true,
+    category: "trust",
+  },
+];
+
+const renderIcon = (v: Verdict) => {
+  if (v === true) {
+    return {
+      bg: "bg-green-500/10",
+      color: "text-green-600",
+      label: "Yes",
+      svg: `<polyline points="20 6 9 17 4 12"></polyline>`,
+      strokeWidth: 3,
+    };
+  }
+  if (v === "maybe") {
+    return {
+      bg: "bg-amber-500/15",
+      color: "text-amber-600",
+      label: "Partial",
+      svg: `<line x1="5" y1="12" x2="19" y2="12"></line>`,
+      strokeWidth: 3,
+    };
+  }
+  return {
+    bg: "bg-red-500/10",
+    color: "text-red-500/80",
+    label: "No",
+    svg: `<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>`,
+    strokeWidth: 3,
+  };
+};
+
+const usIcon = {
+  bg: "bg-[var(--color-accent)]",
+  color: "text-yellow-950",
+  svg: `<polyline points="20 6 9 17 4 12"></polyline>`,
+  strokeWidth: 3.5,
+};
+---
+
+<section class="mx-auto max-w-[1200px] px-6 py-12 md:px-12 md:py-20">
+  {/* Header */}
+  <div class="max-w-3xl">
+    <span
+      class="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent-strong)]"
+    >
+      Honest comparison
+    </span>
+    <h1
+      class="mt-3 text-4xl font-bold tracking-tight text-[var(--color-fg)] md:text-5xl lg:text-6xl leading-[1.05]"
+    >
+      AlwaysOnTopNotes vs
+      <span class="relative inline-block">
+        <span class="relative z-10">every other sticky notes app.</span>
+        <span
+          class="absolute inset-x-0 bottom-1 h-3 -skew-y-1 bg-[var(--color-accent)] opacity-80"
+          aria-hidden="true"
+        ></span>
+      </span>
+    </h1>
+    <p class="mt-6 text-base leading-relaxed text-[var(--color-fg-muted)] md:text-lg max-w-2xl">
+      Brutally honest, row-by-row. Including where the competition beats us
+      (Apple's iCloud sync, for one). Updated every quarter — last review:
+      {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
+    </p>
+
+    {/* Legend chips */}
+    <div class="mt-8 flex flex-wrap items-center gap-3 text-sm">
+      <span class="inline-flex items-center gap-1.5 text-[var(--color-fg-muted)]">
+        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-500/10 text-green-600">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </span>
+        Yes
+      </span>
+      <span class="inline-flex items-center gap-1.5 text-[var(--color-fg-muted)]">
+        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/15 text-amber-600">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </span>
+        Partial — hover for details
+      </span>
+      <span class="inline-flex items-center gap-1.5 text-[var(--color-fg-muted)]">
+        <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 text-red-500/80">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </span>
+        No
+      </span>
+    </div>
+  </div>
+
+  {/* DESKTOP table */}
+  <div
+    class="mt-12 hidden overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] md:block"
+  >
+    <table class="w-full">
+      <thead>
+        <tr class="border-b border-[var(--color-border)]">
+          <th
+            class="sticky top-0 z-10 bg-[var(--color-bg-subtle)] px-6 py-5 text-left text-xs font-semibold uppercase tracking-wider text-[var(--color-fg-muted)] backdrop-blur-md"
+            scope="col"
+            style="min-width: 280px;"
+          >
+            Feature
+          </th>
+          {competitors.map((c) => (
+            <th
+              class="sticky top-0 z-10 bg-[var(--color-bg-subtle)] px-3 py-5 text-center text-xs font-semibold uppercase tracking-wider text-[var(--color-fg-muted)] backdrop-blur-md whitespace-pre-line"
+              scope="col"
+            >
+              {c.name}
+            </th>
+          ))}
+          <th
+            class="sticky top-0 z-10 bg-[var(--color-accent)]/25 px-3 py-5 text-center text-xs font-bold uppercase tracking-wider text-[var(--color-fg)] backdrop-blur-md ring-1 ring-inset ring-[var(--color-accent)]/40"
+            scope="col"
+          >
+            AOTN
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => {
+          const cat = categoryColors[row.category];
+          return (
+            <tr
+              class:list={[
+                "border-b border-[var(--color-border)] transition-colors hover:bg-[var(--color-bg-muted)]/30",
+                i === rows.length - 1 && "border-b-0",
+              ]}
+            >
+              <th class="px-6 py-5 text-left align-top" scope="row">
+                <div class="flex items-start gap-3">
+                  {/* Category color band — like a sticky note tab */}
+                  <span
+                    class="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-sm"
+                    style={`background: ${cat.bg};`}
+                    title={cat.label}
+                    aria-label={cat.label}
+                  ></span>
+                  <div>
+                    <p class="text-sm font-medium text-[var(--color-fg)]">
+                      {row.feature}
+                    </p>
+                    <p class="mt-1 text-xs text-[var(--color-fg-subtle)] leading-relaxed">
+                      {row.why}
+                    </p>
+                  </div>
+                </div>
+              </th>
+              {row.others.map((v, idx) => {
+                const icon = renderIcon(v);
+                const note = row.notes?.[idx];
+                return (
+                  <td class="px-3 py-5 text-center align-top">
+                    <span
+                      class={`inline-flex h-7 w-7 items-center justify-center rounded-full ${icon.bg} ${icon.color}`}
+                      title={note ?? icon.label}
+                      aria-label={note ? `${icon.label} — ${note}` : icon.label}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width={icon.strokeWidth}
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                        set:html={icon.svg}
+                      />
+                    </span>
+                    {note && (
+                      <p class="mt-1.5 text-[10px] leading-tight text-[var(--color-fg-subtle)] max-w-[120px] mx-auto">
+                        {note}
+                      </p>
+                    )}
+                  </td>
+                );
+              })}
+              <td class="bg-[var(--color-accent)]/15 px-3 py-5 text-center align-top ring-1 ring-inset ring-[var(--color-accent)]/30">
+                <span
+                  class={`inline-flex h-7 w-7 items-center justify-center rounded-full ${row.us ? usIcon.bg + ' ' + usIcon.color : 'bg-[var(--color-bg-muted)] text-[var(--color-fg-muted)]'}`}
+                  aria-label={row.us ? "Yes" : "No (yet)"}
+                >
+                  {row.us ? (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width={usIcon.strokeWidth}
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      set:html={usIcon.svg}
+                    />
+                  ) : (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      class="text-[var(--color-fg-muted)]"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  )}
+                </span>
+                {row.note && (
+                  <p class="mt-1.5 text-[10px] leading-tight text-[var(--color-accent-strong)] max-w-[120px] mx-auto">
+                    {row.note}
+                  </p>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+
+  {/* MOBILE card stack — one card per feature */}
+  <div class="mt-12 space-y-4 md:hidden">
+    {rows.map((row) => {
+      const cat = categoryColors[row.category];
+      return (
+        <div
+          class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)]"
+        >
+          {/* Feature header */}
+          <div class="border-b border-[var(--color-border)] p-4">
+            <div class="flex items-start gap-2">
+              <span
+                class="mt-1 inline-block h-3 w-3 flex-shrink-0 rounded-sm"
+                style={`background: ${cat.bg};`}
+                aria-label={cat.label}
+              ></span>
+              <div>
+                <h3 class="text-base font-semibold text-[var(--color-fg)]">
+                  {row.feature}
+                </h3>
+                <p class="mt-1 text-xs text-[var(--color-fg-muted)] leading-relaxed">
+                  {row.why}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* Per-competitor rows */}
+          <ul class="divide-y divide-[var(--color-border)]">
+            {competitors.map((c, idx) => {
+              const v = row.others[idx];
+              const icon = renderIcon(v);
+              const note = row.notes?.[idx];
+              return (
+                <li class="flex items-center justify-between gap-3 px-4 py-3">
+                  <div class="flex-1 min-w-0">
+                    <span class="text-sm text-[var(--color-fg-muted)]">{c.short}</span>
+                    {note && (
+                      <p class="text-[11px] text-[var(--color-fg-subtle)] mt-0.5 leading-snug">
+                        {note}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    class={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${icon.bg} ${icon.color}`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={icon.strokeWidth} stroke-linecap="round" stroke-linejoin="round" set:html={icon.svg} />
+                  </span>
+                </li>
+              );
+            })}
+            {/* Us — highlighted */}
+            <li class="flex items-center justify-between gap-3 bg-[var(--color-accent)]/15 px-4 py-3 ring-1 ring-inset ring-[var(--color-accent)]/30">
+              <div class="flex-1 min-w-0">
+                <span class="text-sm font-bold text-[var(--color-fg)]">AlwaysOnTopNotes</span>
+                {row.note && (
+                  <p class="text-[11px] text-[var(--color-accent-strong)] mt-0.5 leading-snug">
+                    {row.note}
+                  </p>
+                )}
+              </div>
+              <span class={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${row.us ? usIcon.bg + ' ' + usIcon.color : 'bg-[var(--color-bg-muted)] text-[var(--color-fg-muted)]'}`}>
+                {row.us ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={usIcon.strokeWidth} stroke-linecap="round" stroke-linejoin="round" set:html={usIcon.svg} />
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                )}
+              </span>
+            </li>
+          </ul>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* CTA below table */}
+  <div class="mt-16 grid gap-6 md:grid-cols-2">
+    <div
+      class="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-8"
+    >
+      <h3 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+        Convinced?
+      </h3>
+      <p class="mt-2 text-[var(--color-fg-muted)]">
+        Open the app in your browser. No install, no signup, your notes never leave your device.
+      </p>
+      <a
+        href="/app"
+        class="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--color-fg)] px-5 text-sm font-medium text-[var(--color-bg)] transition-opacity hover:opacity-90 active:scale-[0.97] no-underline hover:no-underline"
+      >
+        Open notes — it's free
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+      </a>
+    </div>
+    <div
+      class="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-8"
+    >
+      <h3 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+        Skeptical?
+      </h3>
+      <p class="mt-2 text-[var(--color-fg-muted)]">
+        Read the FAQ for the honest answers — or audit the source code yourself.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a
+          href="/faq"
+          class="inline-flex h-11 items-center rounded-lg border border-[var(--color-border)] bg-transparent px-5 text-sm font-medium text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-muted)] active:scale-[0.97] no-underline hover:no-underline"
+        >
+          Read the FAQ
+        </a>
+        <a
+          href="https://github.com/shrestha-tripathi/alwaysontopnotes"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex h-11 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-transparent px-5 text-sm font-medium text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-muted)] active:scale-[0.97] no-underline hover:no-underline"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>
+          Source on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

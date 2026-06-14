@@ -1,0 +1,302 @@
+---
+/**
+ * FAQ — accordion-style FAQ section with FAQPage JSON-LD schema for SEO.
+ *
+ * Strategy (from UX-CHARTER):
+ *   - Answer real questions users have BEFORE they ask
+ *   - Reinforce the "why switch" pitch through honest answers
+ *   - JSON-LD = direct surface in Google's "People Also Ask" + AI overview
+ *   - Native <details> elements for zero-JS accessibility + keyboard nav
+ *
+ * Used on both / (homepage) and /faq (dedicated page).
+ * Pass `compact={true}` for homepage variant (smaller header).
+ */
+
+export interface Props {
+  /** Compact variant for embedding on homepage. Default false (full /faq page). */
+  compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+
+// FAQ data — categorized for the schema + visual grouping.
+// Each Q&A is designed to:
+//   - Surface in Google's "People Also Ask" with informational intent
+//   - Pre-empt a real switching objection
+//   - Reinforce the privacy + cross-platform pitch
+const faqGroups = [
+  {
+    title: "Privacy & storage",
+    icon: "shield",
+    items: [
+      {
+        q: "Where are my notes actually stored?",
+        a: "In your browser's local storage — specifically the Origin Private File System (OPFS) with an IndexedDB fallback for older browsers. Nothing is sent to our servers. There IS no server. The entire app is static HTML + JavaScript served from a CDN. Open your browser's DevTools → Network tab and try saving a note. You won't see a single network request.",
+      },
+      {
+        q: "Can you read my notes?",
+        a: "No. We can't because we don't have them. Notes live in your browser's local storage on your device, never on our infrastructure. The MIT-licensed source on GitHub is auditable line-by-line — you can verify there's no upload code, no analytics on note content, no telemetry. We get one anonymous pageview from Google Analytics when you load the page. That's it.",
+      },
+      {
+        q: "What happens to my notes if I clear my browser data?",
+        a: "They're gone. That's the tradeoff for true local storage: your notes live in YOUR browser, and clearing browser data wipes them like it wipes cookies. This is why we ship a one-click \"Export all as markdown\" button — back up before clearing. Switching to a new device? Same answer: export → import. (Real device sync via end-to-end encrypted CRDTs is on the long-term roadmap, but only as an opt-in.)",
+      },
+      {
+        q: "Is it safe to type sensitive information?",
+        a: "Safer than typing it into any cloud-based notes app (Apple Notes, Google Keep, Notion, etc.), because those services upload, store, index, and back up your text. We don't. But \"safe\" is relative — anything in your browser is accessible to malware running on your device, the same way it could access your bank app. For passwords specifically, use a dedicated password manager.",
+      },
+    ],
+  },
+  {
+    title: "Compatibility & setup",
+    icon: "globe",
+    items: [
+      {
+        q: "Which browsers does it work in?",
+        a: "Full experience (with the floating window): Chrome 116+, Edge 116+, Opera 102+, Brave 1.58+. Read-write but no floating: Safari 17+ (no Document PiP support yet), Firefox (no Document PiP support yet). Mobile browsers can edit notes normally — Document PiP is desktop-only, period.",
+      },
+      {
+        q: "Do I need to install anything?",
+        a: "No — it works as a website. But if you want a desktop icon and offline support, click \"Install as app\" in the menu (or your browser's address bar). That makes it a Progressive Web App, available offline, launchable from your Start menu / Dock without opening the browser first.",
+      },
+      {
+        q: "Does it work offline?",
+        a: "Yes, once you've loaded it once. The app is cached via a service worker on first visit. Subsequent visits work fully offline — create notes, edit, search, pop out to floating window. Your notes never needed the internet to begin with, since they live locally.",
+      },
+    ],
+  },
+  {
+    title: "Vs native sticky notes",
+    icon: "layers",
+    items: [
+      {
+        q: "How is this different from Windows Sticky Notes?",
+        a: "Three structural advantages: (1) Our notes float over Zoom, Teams, full-screen video — Windows Sticky Notes get hidden behind any maximized window. (2) Same notes work on Mac, Linux, and Chromebook — Windows Sticky Notes is Windows-only. (3) Markdown export anytime — Windows Sticky Notes has no export at all, so a Windows reinstall wipes them permanently. Plus rich text, keyboard shortcuts, and open source code you can audit.",
+      },
+      {
+        q: "Can I sync notes between my Mac and PC?",
+        a: "Not automatically — we don't upload anything, so there's no \"cloud sync\" to enable. The current workflow is: export as markdown from one device → import on the other. End-to-end encrypted device sync (using CRDTs over a relay you control) is on the long-term roadmap, but only as an opt-in feature. The default will always be local-only.",
+      },
+    ],
+  },
+  {
+    title: "Features",
+    icon: "type",
+    items: [
+      {
+        q: "Can I use markdown?",
+        a: "Yes — the editor (built on Tiptap) supports markdown shortcuts as you type. Type `# ` for a heading, `- ` for a list, `[ ] ` for a checkbox, `**bold**` for bold, ` ``code`` ` for inline code, and so on. You can also paste markdown and it renders rich, or paste rich text and it's preserved. Export gives you clean markdown back.",
+      },
+      {
+        q: "Can I share notes with someone else?",
+        a: "Export the note as a markdown file (`.md`) and share that — same as you'd share any other file. We deliberately don't offer a cloud share link, because creating one would require uploading the note to our server, which breaks the core privacy promise.",
+      },
+    ],
+  },
+  {
+    title: "Sustainability",
+    icon: "code",
+    items: [
+      {
+        q: "Is it really free forever?",
+        a: "Yes. No ads, no tracking, no premium tier, no \"upgrade for more features.\" The whole app is a static site on Cloudflare Pages — running costs are essentially zero. Maintained as an indie project by one developer (Shrestha). If you want to support the work, there's an optional tip jar in the menu, but it's strictly optional.",
+      },
+      {
+        q: "What if the site goes down or the project is abandoned?",
+        a: "Your notes don't depend on us. They're in your browser's local storage, accessible even if alwaysontopnotes.com vanishes tomorrow. The source code is MIT-licensed on GitHub — fork it, self-host it (it's a static site, runs on any web server), or run it from a local file. The export feature also gives you portable markdown files that work with any text editor forever.",
+      },
+    ],
+  },
+];
+
+// Flatten for JSON-LD schema
+const allFaqs = faqGroups.flatMap((g) => g.items);
+
+const jsonLdFaq = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: allFaqs.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.a,
+    },
+  })),
+};
+
+// Icon SVG paths (inline = no extra request)
+const iconPaths: Record<string, string> = {
+  shield: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>`,
+  globe: `<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>`,
+  layers: `<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>`,
+  type: `<polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line>`,
+  code: `<polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>`,
+};
+---
+
+<section
+  id="faq"
+  class={`mx-auto max-w-[1200px] px-6 md:px-12 ${compact ? "py-16 md:py-24" : "py-12 md:py-20"}`}
+>
+  {/* JSON-LD FAQPage schema — direct SEO win, surfaces in Google "People Also Ask" */}
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLdFaq)} />
+
+  {/* Header */}
+  <div class={compact ? "max-w-2xl text-center mx-auto" : "max-w-3xl"}>
+    {compact && (
+      <span
+        class="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent-strong)]"
+      >
+        Questions you might have
+      </span>
+    )}
+    <h2
+      class={`tracking-tight text-[var(--color-fg)] ${compact ? "mt-3 text-3xl md:text-4xl lg:text-5xl font-bold" : "text-4xl md:text-5xl lg:text-6xl font-bold leading-[1.05]"}`}
+    >
+      {compact ? (
+        <>
+          Honest answers to the
+          {" "}
+          <span class="relative inline-block">
+            <span class="relative z-10">real questions.</span>
+            <span
+              class="absolute inset-x-0 bottom-1 h-3 -skew-y-1 bg-[var(--color-accent)] opacity-80"
+              aria-hidden="true"
+            ></span>
+          </span>
+        </>
+      ) : (
+        "Frequently asked questions"
+      )}
+    </h2>
+    {!compact && (
+      <p class="mt-5 text-base leading-relaxed text-[var(--color-fg-muted)] md:text-lg max-w-2xl">
+        Real answers to questions people actually ask before switching from
+        Windows Sticky Notes, macOS Stickies, or cloud-based notes apps. If
+        yours isn't here,{" "}
+        <a href="/contact" class="prose-link">tell us</a> and we'll add it.
+      </p>
+    )}
+  </div>
+
+  {/* FAQ groups */}
+  <div class={`mt-12 ${compact ? "max-w-3xl mx-auto" : "max-w-4xl"} space-y-10`}>
+    {faqGroups.map((group) => (
+      <div>
+        {/* Group header */}
+        <div class="mb-4 flex items-center gap-2.5">
+          <span
+            class="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--color-accent)]/15 text-[var(--color-accent-strong)]"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              set:html={iconPaths[group.icon]}
+            />
+          </span>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-fg-muted)]">
+            {group.title}
+          </h3>
+        </div>
+
+        {/* Q&A list */}
+        <div class="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)]">
+          {group.items.map((item, idx) => (
+            <details
+              class={`faq-item group ${idx > 0 ? "border-t border-[var(--color-border)]" : ""}`}
+            >
+              <summary
+                class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-[var(--color-bg-muted)]/40 md:px-6 md:py-5"
+              >
+                <span class="text-base font-semibold text-[var(--color-fg)] md:text-lg">
+                  {item.q}
+                </span>
+                <span
+                  class="faq-chevron flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-bg-muted)] text-[var(--color-fg-muted)] transition-transform duration-200 group-open:rotate-180 group-open:bg-[var(--color-accent)] group-open:text-yellow-950"
+                  aria-hidden="true"
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </span>
+              </summary>
+              <div class="px-5 pb-5 pt-1 md:px-6 md:pb-6">
+                <p class="max-w-prose text-[15px] leading-relaxed text-[var(--color-fg-muted)] md:text-base">
+                  {item.a}
+                </p>
+              </div>
+            </details>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  {/* "Still have questions?" CTA — only on full /faq page, redundant on home */}
+  {!compact && (
+    <div class="mt-16 max-w-4xl">
+      <div
+        class="flex flex-col gap-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-8 md:flex-row md:items-center md:justify-between md:p-10"
+      >
+        <div>
+          <h3 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+            Still have a question?
+          </h3>
+          <p class="mt-2 text-[var(--color-fg-muted)]">
+            Drop us a line — we read every email and answer within 24h.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <a
+            href="/contact"
+            class="inline-flex h-11 items-center rounded-lg bg-[var(--color-fg)] px-5 text-sm font-medium text-[var(--color-bg)] transition-opacity hover:opacity-90 active:scale-[0.97] no-underline hover:no-underline"
+          >
+            Contact us
+          </a>
+          <a
+            href="https://github.com/shrestha-tripathi/alwaysontopnotes/issues"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex h-11 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-transparent px-5 text-sm font-medium text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-muted)] active:scale-[0.97] no-underline hover:no-underline"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path>
+            </svg>
+            File an issue
+          </a>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <style is:global>
+    /* Strip the default <summary> marker on all browsers */
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary { list-style: none; }
+    details > summary::marker { display: none; }
+
+    /* Subtle focus ring for keyboard nav */
+    .faq-item > summary:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: -2px;
+      border-radius: 8px;
+    }
+  </style>
+</section>

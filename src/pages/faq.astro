@@ -1,0 +1,19 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import FAQ from "../components/FAQ.astro";
+---
+
+<Layout
+  title="FAQ"
+  description="Frequently asked questions about AlwaysOnTopNotes — privacy, browser compatibility, how it compares to Windows Sticky Notes and macOS Stickies, and why it's free forever."
+>
+  <Nav />
+
+  <main>
+    <FAQ compact={false} />
+  </main>
+
+  <Footer />
+</Layout>
