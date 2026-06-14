@@ -70,8 +70,11 @@ export const site = {
    * Google Analytics 4 Measurement ID (format: G-XXXXXXXXXX). Empty string
    * disables the gtag.js snippet entirely. Only injected in production
    * builds so localhost dev never pollutes the analytics property.
+   *
+   * AOTN has its OWN dedicated GA4 property (G-0BQXBH4REP) — NOT the shared
+   * worksoffline family id (G-Q1Y0YHLJ8K) it used to share by mistake.
    */
-  gaId: env.PUBLIC_GA_MEASUREMENT_ID ?? "G-Q1Y0YHLJ8K",
+  gaId: env.PUBLIC_GA_MEASUREMENT_ID ?? "G-0BQXBH4REP",
 } as const;
 
 export type SiteConfig = typeof site;
