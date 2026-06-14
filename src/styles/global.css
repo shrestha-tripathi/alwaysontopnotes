@@ -259,3 +259,93 @@ html[data-theme="light"] {
   transition: transform 0.1s ease;
 }
 .bubble-swatch:hover { transform: scale(1.15); }
+
+/* ============================================================
+   Sticky cards — paper texture + layered shadow stack (commit 9)
+   Source of truth: UX-CHARTER §3.
+
+   The swatch fill is set inline per-card (literal hex — a yellow
+   Post-it stays yellow in dark mode). Here we composite a faint
+   grain image OVER that fill via background-blend-mode: multiply,
+   so the texture darkens only the noise specks and reads identically
+   on every swatch. Tilt comes in via the --rot custom property so
+   CSS can compose it with a hover lift without JS touching transform.
+   ============================================================ */
+.sticky-card {
+  --rot: 0deg;
+  background-image: url("/assets/paper-noise.svg");
+  background-repeat: repeat;
+  background-blend-mode: multiply;
+  transform: rotate(var(--rot));
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 16px 32px -8px rgba(0, 0, 0, 0.12);
+  transition:
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+html[data-theme="dark"] .sticky-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    0 16px 32px -8px rgba(0, 0, 0, 0.6);
+}
+.sticky-card:hover {
+  transform: rotate(calc(var(--rot) * 0.4)) translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 8px 20px rgba(0, 0, 0, 0.1),
+    0 24px 48px -10px rgba(0, 0, 0, 0.16);
+}
+html[data-theme="dark"] .sticky-card:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    0 24px 48px -10px rgba(0, 0, 0, 0.65);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sticky-card,
+  .sticky-card:hover {
+    transform: none;
+    transition: box-shadow 0.16s ease;
+  }
+}
+
+/* ============================================================
+   Color picker — 8 semantic swatches (commit 9 / UX-CHARTER §3)
+   ============================================================ */
+.color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    box-shadow 0.1s ease;
+}
+.color-swatch:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.color-swatch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.color-swatch.is-active {
+  box-shadow:
+    0 0 0 2px var(--color-bg),
+    0 0 0 4px var(--color-accent-strong);
+}
+.color-swatch.is-active::after {
+  content: "✓";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1c1917;
+}

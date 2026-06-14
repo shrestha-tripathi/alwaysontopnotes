@@ -38,6 +38,7 @@ import {
 } from "./types";
 import { emptyDoc, textToDoc, docToText, deriveTitle } from "./docText";
 import type { StorageAdapter } from "./storage/types";
+import { broadcast, subscribe, type InboundMsg } from "./crossTabSync";
 
 export interface NotesState {
   /** Sidebar list (already sorted: pinned first, then updatedAt desc). */
@@ -73,6 +74,11 @@ class NotesStore {
     pendingDelete: { id: string; title: string };
     /** A background persist failed; UI shows a retry toast. */
     error: { message: string };
+    /** A non-error info toast (e.g. "this note was deleted in another tab"). */
+    notice: { message: string };
+    /** A sibling tab edited the CURRENTLY-ACTIVE note; the view reloads the
+     *  editor body IF the user isn't mid-edit (idle). Carries the fresh doc. */
+    remoteActive: { id: string; doc: Note["doc"] };
   }>();
 
   private adapter: StorageAdapter | null = null;
@@ -81,6 +87,8 @@ class NotesStore {
   /** HEAVY, sparse — full docs lazily loaded on demand and cached. */
   private docCache = new Map<string, Note>();
   private pending: PendingDelete | null = null;
+  /** Tear-down handle for the cross-tab BroadcastChannel listener. */
+  private unsubscribeSync: (() => void) | null = null;
 
   private state: NotesState = {
     index: [],
@@ -136,6 +144,63 @@ class NotesStore {
     this.indexMap.clear();
     for (const entry of list) this.indexMap.set(entry.id, entry);
     this.setState({ index: this.reindex(), ready: true });
+    // Start listening for changes made in OTHER tabs (idempotent re-init safe).
+    this.unsubscribeSync?.();
+    this.unsubscribeSync = subscribe((m) => void this.applyRemote(m));
+  }
+
+  /**
+   * Apply a change that happened in ANOTHER tab (SPEC-Phase2 §7). Storage is
+   * already shared, so we re-read the canonical record and patch our in-memory
+   * tiers — we never receive content over the wire, only an id + timestamp.
+   *
+   * Last-write-wins by `updatedAt`: a stale echo that lost a race is ignored,
+   * so a remote message can't clobber a newer local edit. Fully defensive —
+   * any failure is swallowed so a sibling tab can never crash this one.
+   */
+  private async applyRemote(m: InboundMsg): Promise<void> {
+    if (!this.adapter) return;
+    try {
+      if (m.t === "remove") {
+        // Don't drop a note we're mid-soft-deleting locally (our own undo
+        // window owns it); the local timer will hard-delete + re-broadcast.
+        if (this.pending?.note.id === m.id) return;
+        if (!this.indexMap.has(m.id)) return; // already gone here
+        const wasActive = this.state.activeId === m.id;
+        this.untrack(m.id);
+        this.setState({
+          index: this.reindex(),
+          activeId: wasActive ? null : this.state.activeId,
+          active: wasActive ? null : this.state.active,
+        });
+        if (wasActive) {
+          this.emitter.emit("notice", {
+            message: "This note was deleted in another tab.",
+          });
+        }
+        return;
+      }
+
+      // t === "put": re-read the canonical record and merge if it's newer.
+      const local = this.indexMap.get(m.id);
+      if (local && local.updatedAt >= m.updatedAt) return; // our copy is newer/equal
+      const fresh = await this.adapter.get(m.id);
+      if (!fresh) return; // vanished between broadcast and read — ignore
+      this.track(fresh);
+      this.setState({
+        index: this.reindex(),
+        // If the user is viewing this note, refresh the shown copy in state.
+        active: this.state.activeId === m.id ? fresh : this.state.active,
+      });
+      // Tell the view to reload the editor body — but only the VIEW knows if the
+      // user is mid-edit (it owns the debounce), so it gates the actual reload.
+      // (Concurrent same-note typing stays a flagged v1 limitation — §7.)
+      if (this.state.activeId === m.id) {
+        this.emitter.emit("remoteActive", { id: m.id, doc: fresh.doc });
+      }
+    } catch (err) {
+      console.error("[notesStore] applyRemote failed:", err);
+    }
   }
 
   // ── persistence ─────────────────────────────────────────────────────
@@ -145,6 +210,8 @@ class NotesStore {
     this.setState({ saving: true });
     try {
       await this.adapter.put(note);
+      // Tell sibling tabs to re-read this note (id + ts only — never content).
+      broadcast({ t: "put", id: note.id, updatedAt: note.updatedAt });
     } catch (err) {
       this.emitter.emit("error", {
         message: "Couldn't save note — changes are in memory only.",
@@ -298,7 +365,10 @@ class NotesStore {
 
     const timer = setTimeout(() => {
       this.pending = null;
-      if (this.adapter) void this.adapter.remove(note.id);
+      if (this.adapter) {
+        void this.adapter.remove(note.id);
+        broadcast({ t: "remove", id: note.id });
+      }
     }, 5000);
     this.pending = { note, timer };
     this.emitter.emit("pendingDelete", { id: note.id, title: note.title });
@@ -321,7 +391,10 @@ class NotesStore {
     clearTimeout(this.pending.timer);
     const { note } = this.pending;
     this.pending = null;
-    if (this.adapter) void this.adapter.remove(note.id);
+    if (this.adapter) {
+      void this.adapter.remove(note.id);
+      broadcast({ t: "remove", id: note.id });
+    }
   }
 
   /** Set the search query (filtering happens in the view via searchNotes). */

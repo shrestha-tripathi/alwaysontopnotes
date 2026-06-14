@@ -113,13 +113,29 @@ import { site } from "../site.config";
       </aside>
 
       {/* ── Editor pane ─────────────────────────────────────── */}
-      <main class="flex min-w-0 flex-1 flex-col bg-[var(--color-bg)]">
+      <main class="relative flex min-w-0 flex-1 flex-col bg-[var(--color-bg)]">
         {/* Editor toolbar (color + pin + delete) — shown only with a selection */}
         <div
           id="editor-toolbar"
           class="hidden h-12 shrink-0 items-center justify-between border-b border-[var(--color-border)] px-3"
         >
           <div class="flex items-center gap-1.5">
+            <button
+              id="color-btn"
+              type="button"
+              title="Note color"
+              aria-label="Note color"
+              aria-haspopup="true"
+              aria-expanded="false"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+            >
+              <span
+                id="color-btn-dot"
+                class="h-4 w-4 rounded-full border border-black/15 shadow-sm"
+                style="background:#fde047"
+                aria-hidden="true"
+              ></span>
+            </button>
             <button
               id="pin-btn"
               type="button"
@@ -143,6 +159,18 @@ import { site } from "../site.config";
               <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"></path>
             </svg>
           </button>
+        </div>
+
+        {/* Color-picker popover (8 semantic swatches — UX-CHARTER §3). Anchored
+            under the color button; toggled open via #color-btn. Built once here,
+            populated + wired in the island. */}
+        <div
+          id="color-popover"
+          class="absolute left-3 top-12 z-40 hidden w-[180px] rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-2 shadow-xl"
+          role="menu"
+          aria-label="Note color"
+        >
+          <div id="color-grid" class="grid grid-cols-4 gap-1.5"></div>
         </div>
 
         {/* The editor surface */}
@@ -225,8 +253,9 @@ import { site } from "../site.config";
   <script>
     import { notesStore } from "../lib/notesStore";
     import { searchNotes } from "../lib/searchNotes";
-    import { swatchOf, rotationFor } from "../lib/colors";
+    import { swatchOf, rotationFor, SWATCHES, COLOR_ORDER } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
+    import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
 
@@ -242,6 +271,10 @@ import { site } from "../site.config";
     const editorEmptyEl = $("editor-empty");
     const toolbarEl = $("editor-toolbar");
     const pinBtn = $<HTMLButtonElement>("pin-btn");
+    const colorBtn = $<HTMLButtonElement>("color-btn");
+    const colorBtnDot = $("color-btn-dot");
+    const colorPopover = $("color-popover");
+    const colorGrid = $("color-grid");
     const deleteBtn = $<HTMLButtonElement>("delete-btn");
     const bubbleEl = $("bubble-menu");
     const toastEl = $("toast");
@@ -272,10 +305,16 @@ import { site } from "../site.config";
       return editor;
     }
 
-    /** Load a note's doc into the editor (create editor on first use). */
-    async function loadNoteIntoEditor(noteId: string, doc: JSONContent): Promise<void> {
+    /** Load a note's doc into the editor (create editor on first use).
+     *  `force` reloads even if the same note is already shown — used when a
+     *  sibling tab edited the active note and we want to reflect it. */
+    async function loadNoteIntoEditor(
+      noteId: string,
+      doc: JSONContent,
+      force = false,
+    ): Promise<void> {
       const ed = await ensureEditor();
-      if (editorNoteId === noteId) return; // already showing this note
+      if (editorNoteId === noteId && !force) return; // already showing this note
       editorNoteId = noteId;
       applyingProgrammatic = true;
       // `false` = don't emit an update transaction for this programmatic set.
@@ -283,11 +322,16 @@ import { site } from "../site.config";
       applyingProgrammatic = false;
     }
 
-    /** 500ms debounced autosave → store.updateActiveDoc. */
+    /** 500ms debounced autosave → store.updateActiveDoc. A non-null
+     *  `saveDebounce` means an edit is pending (the user is actively typing);
+     *  we null it after the save fires so remote-sync can tell idle from busy. */
     function scheduleSave(doc: JSONContent): void {
       setSaveStatus("saving");
       if (saveDebounce) clearTimeout(saveDebounce);
-      saveDebounce = setTimeout(() => void notesStore.updateActiveDoc(doc), 500);
+      saveDebounce = setTimeout(() => {
+        saveDebounce = null;
+        void notesStore.updateActiveDoc(doc);
+      }, 500);
     }
 
     // ── save status indicator ("Saving…" → "Saved ✓") ────────────────
@@ -383,16 +427,15 @@ import { site } from "../site.config";
           li.tabIndex = 0;
           const selected = entry.id === state.activeId;
           li.className =
-            "group relative cursor-pointer rounded-lg border p-3 transition-shadow " +
+            "sticky-card group relative cursor-pointer rounded-lg border p-3 " +
             (selected
               ? "ring-2 ring-[var(--color-accent)]"
-              : "hover:shadow-md");
+              : "");
           li.style.backgroundColor = sw.bg;
           li.style.borderColor = sw.edge;
           li.style.color = sw.ink;
-          li.style.transform = `rotate(${rotationFor(entry.id)}deg)`;
-          li.style.boxShadow =
-            "0 1px 2px rgba(0,0,0,0.06), 0 4px 10px -4px rgba(0,0,0,0.12)";
+          // Tilt lives in a custom prop so CSS can compose it with a hover lift.
+          li.style.setProperty("--rot", `${rotationFor(entry.id)}deg`);
 
           const titleRow = document.createElement("div");
           titleRow.className = "flex items-start gap-1.5";
@@ -441,10 +484,15 @@ import { site } from "../site.config";
         pinBtn.setAttribute("aria-pressed", String(state.active.pinned));
         pinBtn.style.color = state.active.pinned ? "var(--color-accent-strong)" : "";
         pinBtn.title = state.active.pinned ? "Unpin note" : "Pin note";
+        // Reflect the active note's color on the toolbar dot + keep an open
+        // picker's active ring in sync (e.g. when a sibling tab recolors it).
+        colorBtnDot.style.background = swatchOf(state.active.color).bg;
+        if (isColorPopoverOpen()) syncColorPickerActive();
       } else {
         // Deselected — clear the editor's bound note so re-selecting reloads.
         editorNoteId = null;
         bubbleEl.style.visibility = "hidden";
+        closeColorPopover();
       }
     }
 
@@ -461,6 +509,47 @@ import { site } from "../site.config";
       toastEl.classList.add("hidden");
     }
     const trim = (s: string): string => (s.length > 28 ? s.slice(0, 28) + "…" : s);
+
+    // ── color picker ─────────────────────────────────────────────────────
+    // Build the 8 semantic swatches once (UX-CHARTER §3). Each button sets the
+    // active note's color; the label tooltip doubles as the soft taxonomy.
+    function buildColorPicker(): void {
+      colorGrid.replaceChildren(
+        ...COLOR_ORDER.map((color) => {
+          const sw = SWATCHES[color];
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.dataset.color = color;
+          btn.setAttribute("role", "menuitemradio");
+          btn.title = sw.label;
+          btn.setAttribute("aria-label", sw.label);
+          btn.className = "color-swatch";
+          btn.style.background = sw.bg;
+          btn.style.borderColor = sw.edge;
+          return btn;
+        }),
+      );
+    }
+
+    function openColorPopover(): void {
+      syncColorPickerActive();
+      colorPopover.classList.remove("hidden");
+      colorBtn.setAttribute("aria-expanded", "true");
+    }
+    function closeColorPopover(): void {
+      colorPopover.classList.add("hidden");
+      colorBtn.setAttribute("aria-expanded", "false");
+    }
+    const isColorPopoverOpen = (): boolean =>
+      !colorPopover.classList.contains("hidden");
+
+    // Ring + check the active note's current color in the grid.
+    function syncColorPickerActive(): void {
+      const cur = notesStore.get().active?.color ?? null;
+      colorGrid
+        .querySelectorAll<HTMLButtonElement>("[data-color]")
+        .forEach((b) => b.classList.toggle("is-active", b.dataset.color === cur));
+    }
 
     // ── event wiring ────────────────────────────────────────────────────
 
@@ -504,6 +593,29 @@ import { site } from "../site.config";
       if (id) void notesStore.deleteNote(id);
     });
 
+    // Color picker: toggle popover, pick a swatch, dismiss on outside-click/Esc.
+    buildColorPicker();
+    colorBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isColorPopoverOpen()) closeColorPopover();
+      else openColorPopover();
+    });
+    colorGrid.addEventListener("click", (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-color]");
+      const color = btn?.dataset.color as StickyColor | undefined;
+      const id = notesStore.get().activeId;
+      if (color && id) {
+        void notesStore.setColor(id, color);
+        closeColorPopover();
+      }
+    });
+    // Outside-click closes the popover (capture the document, ignore the button).
+    document.addEventListener("click", (e) => {
+      if (!isColorPopoverOpen()) return;
+      const t = e.target as Node;
+      if (!colorPopover.contains(t) && !colorBtn.contains(t)) closeColorPopover();
+    });
+
     toastAction.addEventListener("click", () => {
       notesStore.undoDelete();
       hideToast();
@@ -527,8 +639,32 @@ import { site } from "../site.config";
       toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 4000);
     });
 
+    // Surface a cross-tab info notice (e.g. "deleted in another tab").
+    notesStore.emitter.on("notice", ({ message }) => {
+      toastMsg.textContent = message;
+      toastAction.textContent = "";
+      toastEl.classList.remove("hidden");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 4000);
+    });
+
+    // A sibling tab edited the note we're viewing. Reload the editor body to
+    // reflect it — but ONLY if the user isn't mid-edit (no pending debounce),
+    // so we never yank the caret out from under active typing (§7 limitation:
+    // simultaneous same-note typing is still last-saver-wins).
+    notesStore.emitter.on("remoteActive", ({ id, doc }) => {
+      if (saveDebounce) return; // user is actively typing — don't clobber
+      void loadNoteIntoEditor(id, doc as JSONContent, true);
+    });
+
     // Keyboard: N = new, / = search (when not typing)
     document.addEventListener("keydown", (e) => {
+      // Escape closes the color popover first (works even with editor focused).
+      if (e.key === "Escape" && isColorPopoverOpen()) {
+        e.preventDefault();
+        closeColorPopover();
+        return;
+      }
       const el = document.activeElement as HTMLElement | null;
       const typing =
         el &&
