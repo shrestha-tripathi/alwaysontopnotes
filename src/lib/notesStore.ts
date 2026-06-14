@@ -288,6 +288,23 @@ class NotesStore {
     return note.id;
   }
 
+  /**
+   * Load EVERY note with its full doc — for bulk export only. Unlike the
+   * sidebar's light index, this deliberately deserializes all docs (a user-
+   * initiated, infrequent action, not a render path). Order matches the
+   * current sorted sidebar so the export is predictable. Cache hits are reused;
+   * misses fetch from the adapter once.
+   */
+  async getAllNotes(): Promise<Note[]> {
+    const ordered = this.reindex();
+    const out: Note[] = [];
+    for (const entry of ordered) {
+      const full = await this.load(entry.id);
+      if (full) out.push(full);
+    }
+    return out;
+  }
+
   /** Select a note (lazy-loads its full doc from cache or adapter). */
   async selectNote(id: string | null): Promise<void> {
     if (id === null) {

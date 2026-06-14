@@ -154,6 +154,48 @@ import { site } from "../site.config";
               <path d="M12 5v14M5 12h14"></path>
             </svg>
           </button>
+          {/* Overflow menu — bulk export / import (kept out of the toolbar so it
+              stays uncluttered). Toggled by #more-btn; dismiss on outside-click/Esc. */}
+          <div class="relative shrink-0">
+            <button
+              id="more-btn"
+              type="button"
+              title="More actions"
+              aria-label="More actions"
+              aria-haspopup="true"
+              aria-expanded="false"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle>
+              </svg>
+            </button>
+            <div
+              id="more-menu"
+              class="absolute right-0 top-11 z-40 hidden w-52 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-1.5 shadow-xl"
+              role="menu"
+              aria-label="More actions"
+            >
+              <button
+                id="export-all-btn"
+                type="button"
+                role="menuitem"
+                class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-muted)]"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg>
+                Export all (.zip)
+              </button>
+              <button
+                id="import-btn"
+                type="button"
+                role="menuitem"
+                class="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-muted)]"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3m0 12-4-4m4 4 4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg>
+                Import .md
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Note list (populated by the island) */}
@@ -222,6 +264,17 @@ import { site } from "../site.config";
                 <path d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path>
               </svg>
             </button>
+            <button
+              id="export-btn"
+              type="button"
+              title="Export this note as Markdown"
+              aria-label="Export this note as Markdown"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path>
+              </svg>
+            </button>
           </div>
           <button
             id="delete-btn"
@@ -270,6 +323,33 @@ import { site } from "../site.config";
           </div>
         </div>
       </main>
+    </div>
+
+    {/* Hidden file input for "Import .md" (picker path). The drag-drop overlay
+        below is the other import path. Both feed the same importMarkdownFiles(). */}
+    <input
+      id="import-input"
+      type="file"
+      accept=".md,.markdown,.mdown,.mkd,.txt,text/markdown,text/plain"
+      multiple
+      class="hidden"
+      aria-hidden="true"
+    />
+
+    {/* Full-window drag-drop import overlay. Shown while a file is dragged over
+        the window; dropping .md files imports them as notes. */}
+    <div
+      id="drop-overlay"
+      class="pointer-events-none fixed inset-0 z-[70] hidden items-center justify-center bg-[color-mix(in_srgb,var(--color-bg)_82%,transparent)] backdrop-blur-sm"
+      aria-hidden="true"
+    >
+      <div class="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-[var(--color-accent)] bg-[var(--color-bg)] px-12 py-10 text-center shadow-2xl">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3m0 12-4-4m4 4 4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg>
+        <div>
+          <p class="text-base font-semibold text-[var(--color-fg)]">Drop to import</p>
+          <p class="mt-1 text-sm text-[var(--color-fg-muted)]">Each .md file becomes a note</p>
+        </div>
+      </div>
     </div>
 
     {/* Floating selection toolbar (Tiptap BubbleMenu host). Hidden until a
@@ -396,6 +476,8 @@ import { site } from "../site.config";
     import { isPipSupported, isPipOpen, openPip, closePip } from "../lib/pipWindow";
     import { initPipTour } from "../lib/pipTour";
     import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
+    import { exportNote, exportAllNotes } from "../lib/exportNotes";
+    import { importMarkdownFiles } from "../lib/importNotes";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
@@ -419,6 +501,13 @@ import { site } from "../site.config";
     const colorPopover = $("color-popover");
     const colorGrid = $("color-grid");
     const deleteBtn = $<HTMLButtonElement>("delete-btn");
+    const exportBtn = $<HTMLButtonElement>("export-btn");
+    const moreBtn = $<HTMLButtonElement>("more-btn");
+    const moreMenu = $("more-menu");
+    const exportAllBtn = $<HTMLButtonElement>("export-all-btn");
+    const importBtn = $<HTMLButtonElement>("import-btn");
+    const importInput = $<HTMLInputElement>("import-input");
+    const dropOverlay = $("drop-overlay");
     const bubbleEl = $("bubble-menu");
     const shortcutsModal = $("shortcuts-modal");
     const shortcutsClose = $<HTMLButtonElement>("shortcuts-close");
@@ -942,6 +1031,20 @@ import { site } from "../site.config";
       if (toastTimer) clearTimeout(toastTimer);
       toastEl.classList.add("hidden");
     }
+    // Lightweight transient toast WITHOUT an action button (import/export
+    // feedback). Reuses the same element; hides the action so it reads as a
+    // plain status pill, then auto-dismisses.
+    function showInfoToast(message: string, ms = 3200): void {
+      toastMsg.textContent = message;
+      toastAction.textContent = "";
+      toastAction.classList.add("hidden");
+      toastEl.classList.remove("hidden");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastEl.classList.add("hidden");
+        toastAction.classList.remove("hidden"); // restore for the undo toast
+      }, ms);
+    }
     const trim = (s: string): string => (s.length > 28 ? s.slice(0, 28) + "…" : s);
 
     // ── color picker ─────────────────────────────────────────────────────
@@ -1194,6 +1297,105 @@ import { site } from "../site.config";
       if (id) void notesStore.deleteNote(id);
     });
 
+    // ── Export / import (Phase 4 commit 15) ───────────────────────────────
+    // Single-note export: download the active note as Markdown.
+    exportBtn.addEventListener("click", () => {
+      const active = notesStore.get().active;
+      if (active) exportNote(active);
+    });
+
+    // Overflow menu open/close.
+    function openMoreMenu(): void {
+      moreMenu.classList.remove("hidden");
+      moreBtn.setAttribute("aria-expanded", "true");
+    }
+    function closeMoreMenu(): void {
+      moreMenu.classList.add("hidden");
+      moreBtn.setAttribute("aria-expanded", "false");
+    }
+    const isMoreMenuOpen = (): boolean => !moreMenu.classList.contains("hidden");
+    moreBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isMoreMenuOpen()) closeMoreMenu();
+      else openMoreMenu();
+    });
+
+    // Export all notes as a .zip.
+    exportAllBtn.addEventListener("click", async () => {
+      closeMoreMenu();
+      const notes = await notesStore.getAllNotes();
+      if (notes.length === 0) {
+        showInfoToast("No notes to export");
+        return;
+      }
+      try {
+        await exportAllNotes(notes);
+        showInfoToast(`Exported ${notes.length} ${notes.length === 1 ? "note" : "notes"} (.zip)`);
+      } catch {
+        showInfoToast("Export failed");
+      }
+    });
+
+    // Import: open the file picker.
+    importBtn.addEventListener("click", () => {
+      closeMoreMenu();
+      importInput.click();
+    });
+
+    // Shared import path for both picker + drag-drop. Seeds one note per file.
+    async function runImport(files: File[]): Promise<void> {
+      if (files.length === 0) return;
+      const summary = await importMarkdownFiles(files, (doc) =>
+        notesStore.seedNote(doc),
+      );
+      const parts: string[] = [];
+      if (summary.imported > 0) {
+        parts.push(`Imported ${summary.imported} ${summary.imported === 1 ? "note" : "notes"}`);
+      }
+      if (summary.skipped > 0) parts.push(`${summary.skipped} skipped`);
+      showInfoToast(parts.join(" · ") || "Nothing to import");
+      if (summary.imported > 0) focusEditorSoon();
+    }
+
+    importInput.addEventListener("change", () => {
+      const files = Array.from(importInput.files ?? []);
+      void runImport(files);
+      importInput.value = ""; // allow re-importing the same file later
+    });
+
+    // Drag-drop import. Show the overlay while a file is dragged over the window;
+    // a depth counter avoids flicker as dragenter/leave fire on child elements.
+    let dragDepth = 0;
+    const hasFiles = (e: DragEvent): boolean =>
+      Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    window.addEventListener("dragenter", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth += 1;
+      dropOverlay.classList.remove("hidden");
+      dropOverlay.classList.add("flex");
+    });
+    window.addEventListener("dragover", (e) => {
+      if (hasFiles(e)) e.preventDefault(); // required so 'drop' fires
+    });
+    window.addEventListener("dragleave", (e) => {
+      if (!hasFiles(e)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) {
+        dropOverlay.classList.add("hidden");
+        dropOverlay.classList.remove("flex");
+      }
+    });
+    window.addEventListener("drop", (e) => {
+      dragDepth = 0;
+      dropOverlay.classList.add("hidden");
+      dropOverlay.classList.remove("flex");
+      if (!e.dataTransfer) return;
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files);
+      void runImport(files);
+    });
+
     // Color picker: toggle popover, pick a swatch, dismiss on outside-click/Esc.
     buildColorPicker();
     colorBtn.addEventListener("click", (e) => {
@@ -1213,9 +1415,13 @@ import { site } from "../site.config";
     // Outside-click closes the popover (works in whichever document has focus —
     // bound to both origin + PiP doc via bindGlobalListeners).
     function onDocClick(e: MouseEvent): void {
-      if (!isColorPopoverOpen()) return;
       const t = e.target as Node;
-      if (!colorPopover.contains(t) && !colorBtn.contains(t)) closeColorPopover();
+      if (isColorPopoverOpen() && !colorPopover.contains(t) && !colorBtn.contains(t)) {
+        closeColorPopover();
+      }
+      if (isMoreMenuOpen() && !moreMenu.contains(t) && !moreBtn.contains(t)) {
+        closeMoreMenu();
+      }
     }
     document.addEventListener("click", onDocClick);
 
