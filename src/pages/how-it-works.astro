@@ -1,0 +1,193 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { site } from "../site.config";
+
+/**
+ * /how-it-works — the Document-PiP explainer. This is the top 404 (it's linked
+ * from the primary Nav). Explains the always-on-top mechanism in plain language
+ * + a 3-step "get a floating note" flow, with HowTo JSON-LD for rich results.
+ */
+
+const steps = [
+  {
+    n: 1,
+    title: "Open the app and write a note",
+    body: "Go to the app — no signup, no install, nothing to download. Press N for a new note and start typing. It autosaves to your browser as you go; nothing is ever uploaded.",
+    icon: "edit",
+  },
+  {
+    n: 2,
+    title: "Click “Pop out” to float it",
+    body: "Hit the pop-out button in the header. Your note lifts into a small always-on-top window using the browser’s Document Picture-in-Picture API — a real OS-level floating window, not a fake overlay.",
+    icon: "pip",
+  },
+  {
+    n: 3,
+    title: "Keep it visible while you work",
+    body: "The floating note stays on top of every other app — Zoom, your IDE, a fullscreen video, anything. Switch notes, resize it, drag it anywhere. Close it and your note snaps back to the tab.",
+    icon: "layers",
+  },
+];
+
+const icons: Record<string, string> = {
+  edit: `<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>`,
+  pip: `<rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><rect x="12" y="10" width="8" height="6" rx="1"></rect>`,
+  layers: `<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>`,
+};
+
+// HowTo JSON-LD — layered on top of the sitewide Organization + WebSite graph.
+const howToJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  name: `How to use ${site.name}`,
+  description:
+    "Create a sticky note in your browser and float it in an always-on-top window using Document Picture-in-Picture.",
+  totalTime: "PT1M",
+  tool: [{ "@type": "HowToTool", name: "A Chromium browser (Chrome or Edge 116+)" }],
+  step: steps.map((s) => ({
+    "@type": "HowToStep",
+    position: s.n,
+    name: s.title,
+    text: s.body,
+    url: `${site.url}/how-it-works#step-${s.n}`,
+  })),
+  publisher: { "@id": `${site.url}/#organization` },
+};
+---
+
+<Layout
+  title="How it works"
+  description="How AlwaysOnTopNotes floats a sticky note over every app — the Document Picture-in-Picture mechanism explained, plus a 3-step guide to your first always-on-top note."
+  jsonLd={[howToJsonLd]}
+>
+  <Nav />
+
+  <main class="mx-auto max-w-[820px] px-6 py-16 md:px-8 md:py-24">
+    <header class="max-w-2xl">
+      <span class="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent-strong)]">
+        How it works
+      </span>
+      <h1 class="mt-3 text-4xl font-bold tracking-tight text-[var(--color-fg)] md:text-5xl">
+        A real floating window, right in your browser.
+      </h1>
+      <p class="mt-5 text-lg leading-relaxed text-[var(--color-fg-muted)]">
+        AlwaysOnTopNotes turns a browser tab into an always-on-top sticky note.
+        No app to install, no account to create — and your notes never leave
+        your device. Here's exactly how it works.
+      </p>
+    </header>
+
+    {/* The mechanism */}
+    <section class="prose mt-16 max-w-none">
+      <h2 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+        The trick: Document Picture-in-Picture
+      </h2>
+      <p class="mt-4 text-base leading-relaxed text-[var(--color-fg-muted)]">
+        You've seen Picture-in-Picture for video — a small player that floats
+        over everything while you do other things. In 2023, Chromium shipped a
+        more powerful version called
+        <strong class="font-semibold text-[var(--color-fg)]">Document Picture-in-Picture</strong>,
+        which lets a website put <em>any</em> HTML into that floating, always-on-top
+        window — not just a video.
+      </p>
+      <p class="mt-4 text-base leading-relaxed text-[var(--color-fg-muted)]">
+        That's the whole magic. When you click "Pop out", we move your note's
+        live editor into a Document-PiP window. It's a genuine OS-level window
+        that stays above every other app — including fullscreen video calls and
+        screen shares — something a normal web page simply cannot do. Because we
+        move the <em>same</em> editor (not a copy), every keystroke, your note
+        color, and autosave keep working seamlessly across the hop.
+      </p>
+    </section>
+
+    {/* 3 steps */}
+    <section class="mt-16">
+      <h2 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+        Your first floating note in three steps
+      </h2>
+      <ol class="mt-8 space-y-5">
+        {steps.map((s) => (
+          <li
+            id={`step-${s.n}`}
+            class="flex gap-5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-6"
+          >
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent-strong)]">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.85"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                set:html={icons[s.icon]}
+              />
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-[var(--color-fg)]">
+                <span class="text-[var(--color-accent-strong)]">{s.n}.</span> {s.title}
+              </h3>
+              <p class="mt-1.5 text-sm leading-relaxed text-[var(--color-fg-muted)]">
+                {s.body}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    {/* Browser support */}
+    <section class="prose mt-16 max-w-none">
+      <h2 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">
+        Which browsers support the floating window?
+      </h2>
+      <p class="mt-4 text-base leading-relaxed text-[var(--color-fg-muted)]">
+        The floating (always-on-top) window needs Document Picture-in-Picture,
+        which today means a <strong class="font-semibold text-[var(--color-fg)]">desktop
+        Chromium browser — Chrome, Edge, Brave, or Opera, version 116 or newer.</strong>
+      </p>
+      <p class="mt-4 text-base leading-relaxed text-[var(--color-fg-muted)]">
+        On Safari and Firefox (and on phones), the floating window isn't
+        available yet — but the rest of the app works perfectly: you can create,
+        edit, search, color, pin, and export notes normally. The pop-out button
+        simply hides itself when your browser can't float, so you never see a
+        broken control.
+      </p>
+    </section>
+
+    {/* Privacy callout */}
+    <section class="mt-16 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-muted)] p-8">
+      <h2 class="text-xl font-bold tracking-tight text-[var(--color-fg)]">
+        And your notes? They never leave your device.
+      </h2>
+      <p class="mt-3 text-base leading-relaxed text-[var(--color-fg-muted)]">
+        Everything you type is stored locally in your browser (IndexedDB) — not
+        on any server. There is no server. The whole app is static files served
+        from a CDN, and the source is
+        <a href={site.githubRepo} target="_blank" rel="noopener" class="prose-link">MIT-licensed on GitHub</a>
+        so you can verify it yourself. Open DevTools → Network and save a note —
+        you won't see a single upload.
+      </p>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a
+          href="/app"
+          class="inline-flex h-11 items-center rounded-lg bg-[var(--color-fg)] px-5 text-sm font-medium text-[var(--color-bg)] transition-opacity hover:opacity-90 no-underline hover:no-underline"
+        >
+          Open the app
+        </a>
+        <a
+          href="/compare"
+          class="inline-flex h-11 items-center rounded-lg border border-[var(--color-border-strong)] px-5 text-sm font-medium text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-subtle)] no-underline hover:no-underline"
+        >
+          Compare with native sticky notes
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Layout>

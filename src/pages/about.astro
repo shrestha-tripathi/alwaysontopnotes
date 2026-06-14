@@ -1,0 +1,151 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { site } from "../site.config";
+
+/**
+ * /about — who built it, why, and the principles. E-E-A-T trust signal + AdSense
+ * "about" requirement. AboutPage JSON-LD layered on the sitewide graph.
+ */
+
+const principles = [
+  {
+    title: "Your data never leaves your device",
+    body: "Not a marketing line — an architecture. There is no server to send notes to. Everything lives in your browser's local storage, and the source is open so you can prove it.",
+    icon: "shield",
+  },
+  {
+    title: "Free, forever, no account",
+    body: "No signup, no email, no trial that expires. The whole point is to be faster than reaching for a native sticky-notes app — friction would defeat that.",
+    icon: "gift",
+  },
+  {
+    title: "Open source, auditable",
+    body: "MIT-licensed and public on GitHub. If you don't trust a privacy claim, you shouldn't have to — you should be able to read the code. So you can.",
+    icon: "code",
+  },
+  {
+    title: "Built for keyboard-first speed",
+    body: "Press N for a new note, / to search, ? for every shortcut. The fastest way to jot a thought should be a keystroke, not a mouse hunt.",
+    icon: "keyboard",
+  },
+];
+
+const icons: Record<string, string> = {
+  shield: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>`,
+  gift: `<polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>`,
+  code: `<polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline>`,
+  keyboard: `<rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path>`,
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  name: `About ${site.name}`,
+  url: `${site.url}/about`,
+  description: `Why ${site.name} exists: the only browser-native floating sticky-notes app — free, open source, and private by design.`,
+  publisher: { "@id": `${site.url}/#organization` },
+};
+---
+
+<Layout
+  title="About"
+  description="Why AlwaysOnTopNotes exists — the only browser-native floating sticky-notes app. Built by an indie developer to be free, open source, and private by design."
+  jsonLd={[jsonLd]}
+>
+  <Nav />
+
+  <main class="mx-auto max-w-[760px] px-6 py-16 md:px-8 md:py-24">
+    <header class="max-w-2xl">
+      <span class="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent-strong)]">
+        About
+      </span>
+      <h1 class="mt-3 text-4xl font-bold tracking-tight text-[var(--color-fg)] md:text-5xl">
+        Sticky notes, finally done right for the browser.
+      </h1>
+      <p class="mt-5 text-lg leading-relaxed text-[var(--color-fg-muted)]">
+        {site.name} is a free, open-source app that gives you real always-on-top
+        sticky notes — no install, no account, and nothing ever leaves your
+        device.
+      </p>
+    </header>
+
+    <div class="prose mt-12 max-w-none space-y-6">
+      <h2 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">Why it exists</h2>
+      <p class="text-base leading-relaxed text-[var(--color-fg-muted)]">
+        Native sticky-notes apps — Windows Sticky Notes, macOS Stickies — have
+        been around for two decades, but they share two frustrations: they
+        disappear behind your other windows exactly when you need them, and
+        they're locked to one operating system. Cloud notes apps solve the
+        "always available" part, but only by uploading everything you write.
+      </p>
+      <p class="text-base leading-relaxed text-[var(--color-fg-muted)]">
+        When browsers shipped the Document Picture-in-Picture API, a third option
+        became possible for the first time: a sticky note that floats above every
+        app like a native one, works on any desktop OS like a website, and keeps
+        your data entirely on your device. As far as we can tell,
+        {site.name} is the only app that does all three. So we built it.
+      </p>
+    </div>
+
+    <section class="mt-14">
+      <h2 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">What we believe</h2>
+      <div class="mt-6 grid gap-4 sm:grid-cols-2">
+        {principles.map((p) => (
+          <div class="rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-6">
+            <div class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-accent)]/15 text-[var(--color-accent-strong)]">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.85"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                set:html={icons[p.icon]}
+              />
+            </div>
+            <h3 class="mt-4 text-base font-semibold text-[var(--color-fg)]">{p.title}</h3>
+            <p class="mt-1.5 text-sm leading-relaxed text-[var(--color-fg-muted)]">{p.body}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="prose mt-14 max-w-none space-y-6">
+      <h2 class="text-2xl font-bold tracking-tight text-[var(--color-fg)]">Who builds it</h2>
+      <p class="text-base leading-relaxed text-[var(--color-fg-muted)]">
+        {site.name} is built and maintained by {site.author}, an independent
+        software developer, as part of a small family of browser-native,
+        privacy-first tools that run entirely on your device. It's funded by
+        being cheap to run (it's just static files) and, eventually, unobtrusive
+        ads — never by selling data we don't even collect.
+      </p>
+      <p class="text-base leading-relaxed text-[var(--color-fg-muted)]">
+        Have feedback, a bug, or an idea? We'd genuinely like to hear it —
+        <a href="/contact" class="prose-link">get in touch</a>, or read the code
+        on <a href={site.githubRepo} target="_blank" rel="noopener" class="prose-link">GitHub</a>.
+      </p>
+    </section>
+
+    <div class="mt-12 flex flex-wrap gap-3">
+      <a
+        href="/app"
+        class="inline-flex h-11 items-center rounded-lg bg-[var(--color-fg)] px-5 text-sm font-medium text-[var(--color-bg)] transition-opacity hover:opacity-90 no-underline hover:no-underline"
+      >
+        Open the app
+      </a>
+      <a
+        href="/how-it-works"
+        class="inline-flex h-11 items-center rounded-lg border border-[var(--color-border-strong)] px-5 text-sm font-medium text-[var(--color-fg)] transition-colors hover:bg-[var(--color-bg-subtle)] no-underline hover:no-underline"
+      >
+        How it works
+      </a>
+    </div>
+  </main>
+
+  <Footer />
+</Layout>

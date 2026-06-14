@@ -1,4 +1,11 @@
+# robots.txt — https://www.robotstxt.org/
+
+# Allow all crawlers full access to public content + assets.
+# (The /app surface is the tool itself and is marked noindex via the page's
+# meta robots tag, so it's intentionally omitted from the sitemap — but it is
+# NOT disallowed here, so its assets stay crawlable.)
 User-agent: *
 Allow: /
 
+# Sitemap discovery
 Sitemap: https://alwaysontopnotes.com/sitemap.xml
