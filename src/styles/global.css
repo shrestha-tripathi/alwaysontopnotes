@@ -805,3 +805,60 @@ html[data-theme="dark"] .sticky-card:hover {
     transition: none !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Native-notes scrollbars (.nice-scroll). The default OS scrollbar (chunky,
+ * with arrow buttons, full-contrast track) breaks the sticky-note illusion —
+ * especially in the PiP float. Replace it with a thin, rounded, auto-dimming
+ * thumb and no track/buttons. On the tinted editor surface the thumb picks up
+ * the note ink so it reads as part of the paper; elsewhere it's a neutral.
+ * Firefox uses the standard scrollbar-width/color props (no ::-webkit access).
+ * ─────────────────────────────────────────────────────────────────────── */
+.nice-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-fg) 22%, transparent) transparent;
+}
+.nice-scroll::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-fg) 20%, transparent);
+  border-radius: 9999px;
+  /* Transparent border = padding that insets the thumb so it floats inside the
+     track with a rounded-pill look (the classic native-feel trick). */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 140ms ease;
+}
+.nice-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-fg) 38%, transparent);
+}
+.nice-scroll::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--color-fg) 50%, transparent);
+}
+/* No arrow buttons / no corner — keep it clean. */
+.nice-scroll::-webkit-scrollbar-button,
+.nice-scroll::-webkit-scrollbar-corner {
+  display: none;
+}
+
+/* On the tinted editor surface (a note is active), the thumb uses the note INK
+   so the scrollbar belongs to the sticky paper instead of reading as gray
+   chrome. Scoped to the editor scroll wrapper (inside <main>) — the sidebar
+   #note-list keeps the neutral thumb since it's never tinted. */
+#app-root[style*="--note-bg"] main .nice-scroll {
+  scrollbar-color: color-mix(in srgb, var(--note-ink) 28%, transparent) transparent;
+}
+#app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--note-ink) 26%, transparent);
+}
+#app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--note-ink) 42%, transparent);
+}
+#app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--note-ink) 55%, transparent);
+}
