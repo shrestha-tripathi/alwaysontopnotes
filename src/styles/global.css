@@ -1170,3 +1170,27 @@ html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scr
     transition: none;
   }
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Markdown edit-mode toggle (#md-toggle-btn). When ON (raw-source mode) the
+   button reads "pressed" with the accent so the user always knows which mode
+   they're in. The textarea (#md-editor) inherits the note-tinted surface from
+   the editor pane; its caret/selection use the note ink for paper realism.
+   ────────────────────────────────────────────────────────────────────────── */
+#md-toggle-btn.is-active {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent-strong);
+}
+/* On the tinted editor surface in PiP, the active toggle follows the note ink
+   so it stays legible on the pastel (same literal-swatch rule as <mark>). */
+:where(.pip-mode) #app-root[style*="--note-bg"] #md-toggle-btn.is-active {
+  background: color-mix(in srgb, var(--note-ink) 14%, transparent);
+  color: var(--note-ink);
+}
+#md-editor {
+  caret-color: var(--note-ink, var(--color-fg));
+  tab-size: 2;
+}
+#md-editor::placeholder {
+  color: color-mix(in srgb, var(--note-ink, var(--color-fg)) 45%, transparent);
+}

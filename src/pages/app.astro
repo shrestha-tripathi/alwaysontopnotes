@@ -316,6 +316,21 @@ import { site } from "../site.config";
                 <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path>
               </svg>
             </button>
+            <button
+              id="md-toggle-btn"
+              type="button"
+              title="Edit as Markdown"
+              aria-label="Edit as Markdown"
+              aria-pressed="false"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+            >
+              {/* Markdown wordmark glyph (the standard "M↓" badge). */}
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="2.5" y="5" width="19" height="14" rx="2.5"></rect>
+                <path d="M6 15V9l3 3 3-3v6"></path>
+                <path d="M16.5 9v4.5m0 0L15 12m1.5 1.5L18 12"></path>
+              </svg>
+            </button>
           </div>
           <button
             id="delete-btn"
@@ -349,6 +364,19 @@ import { site } from "../site.config";
             id="editor-host"
             class="hidden h-full px-6 py-5"
           ></div>
+
+          {/* Raw Markdown editor (toggled on via #md-toggle-btn). Same paper
+              surface; monospace. Hidden by default — Preview (Tiptap) is the
+              default mode. */}
+          <textarea
+            id="md-editor"
+            class="hidden h-full w-full resize-none bg-transparent px-6 py-5 font-mono text-sm leading-relaxed text-[var(--note-ink,var(--color-fg))] outline-none"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+            aria-label="Markdown source"
+            placeholder="# Write in Markdown…"
+          ></textarea>
 
           {/* No-selection state */}
           <div
@@ -524,6 +552,8 @@ import { site } from "../site.config";
     import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
     import { exportNote, exportAllNotes } from "../lib/exportNotes";
     import { importMarkdownFiles } from "../lib/importNotes";
+    import { docToMarkdown } from "../lib/markdown/serialize";
+    import { markdownToDoc } from "../lib/markdown/parse";
     import { initPwaInstall } from "../lib/pwaInstall";
     import { initThemeToggle } from "../lib/themeToggle";
     import { initPipStack } from "../lib/pipStack";
@@ -542,6 +572,7 @@ import { site } from "../site.config";
     const searchEl = $<HTMLInputElement>("search-input");
     const newBtn = $<HTMLButtonElement>("new-note-btn");
     const editorHost = $("editor-host");
+    const mdEditor = $<HTMLTextAreaElement>("md-editor");
     const editorEmptyEl = $("editor-empty");
     const toolbarEl = $("editor-toolbar");
     const pinBtn = $<HTMLButtonElement>("pin-btn");
@@ -551,6 +582,7 @@ import { site } from "../site.config";
     const colorGrid = $("color-grid");
     const deleteBtn = $<HTMLButtonElement>("delete-btn");
     const exportBtn = $<HTMLButtonElement>("export-btn");
+    const mdToggleBtn = $<HTMLButtonElement>("md-toggle-btn");
     const moreBtn = $<HTMLButtonElement>("more-btn");
     const moreMenu = $("more-menu");
     const exportAllBtn = $<HTMLButtonElement>("export-all-btn");
@@ -623,6 +655,93 @@ import { site } from "../site.config";
         saveDebounce = null;
         void notesStore.updateActiveDoc(doc);
       }, 500);
+    }
+
+    // ── Markdown edit mode (raw-source ⇄ WYSIWYG toggle) ───────────────
+    // The toolbar's #md-toggle-btn flips the editor surface between the Tiptap
+    // WYSIWYG (default "Preview") and a raw Markdown <textarea> ("Markdown").
+    // Both edit the SAME note and funnel through the SAME debounced store path
+    // (updateActiveDoc), so title/preview/cross-tab-sync stay consistent.
+    let mdMode = false;
+    let mdLossHintShown = false;
+    let mdNoteId: string | null = null; // which note the textarea currently holds
+
+    /** Debounced autosave for the textarea path: parse MD → doc → store.
+     *  Reuses `saveDebounce` so the "is the user typing" idle-gate (used by
+     *  remoteActive cross-tab reload) treats MD typing identically to WYSIWYG.
+     *  Captures the note id at schedule time and drops the save if the user
+     *  switched notes before it fired — a stale save must never write one note's
+     *  text onto another. */
+    function scheduleMdSave(text: string): void {
+      setSaveStatus("saving");
+      const forId = notesStore.get().activeId;
+      if (saveDebounce) clearTimeout(saveDebounce);
+      saveDebounce = setTimeout(() => {
+        saveDebounce = null;
+        if (notesStore.get().activeId !== forId) return; // switched away — drop
+        void notesStore.updateActiveDoc(markdownToDoc(text) as JSONContent);
+      }, 500);
+    }
+
+    /** Reflect MD vs Preview on the DOM: which surface shows + button state.
+     *  Called by render() too, so switching notes / empty-state stays correct. */
+    function syncEditorMode(hasActive: boolean): void {
+      // Tiptap host shows only in Preview mode with an active note; the textarea
+      // shows only in Markdown mode with an active note.
+      editorHost.classList.toggle("hidden", !hasActive || mdMode);
+      mdEditor.classList.toggle("hidden", !hasActive || !mdMode);
+      mdToggleBtn.setAttribute("aria-pressed", String(mdMode));
+      mdToggleBtn.classList.toggle("is-active", mdMode);
+      mdToggleBtn.title = mdMode ? "Back to rich text" : "Edit as Markdown";
+      mdToggleBtn.setAttribute("aria-label", mdToggleBtn.title);
+    }
+
+    /** Enter raw-Markdown mode: serialize the active note's doc into the
+     *  textarea. Flushes any pending WYSIWYG save first so we serialize the
+     *  freshest doc. */
+    async function enterMarkdownMode(): Promise<void> {
+      const active = notesStore.get().active;
+      if (!active) return;
+      // Flush a pending Tiptap autosave so we serialize the latest content.
+      if (saveDebounce) {
+        clearTimeout(saveDebounce);
+        saveDebounce = null;
+        if (editor) await notesStore.updateActiveDoc(editor.getJSON() as JSONContent);
+      }
+      mdMode = true;
+      const doc = notesStore.get().active?.doc ?? active.doc;
+      mdEditor.value = docToMarkdown(doc as JSONContent);
+      mdNoteId = active.id;
+      syncEditorMode(true);
+      // One-time, non-blocking heads-up about the lossy marks.
+      if (!mdLossHintShown) {
+        mdLossHintShown = true;
+        showInfoToast("Markdown mode: underline & text color aren't represented in Markdown.");
+      }
+      mdEditor.focus();
+    }
+
+    /** Exit raw-Markdown mode: parse the textarea back into a doc, persist it,
+     *  and re-render it in the Tiptap editor. */
+    async function exitMarkdownMode(): Promise<void> {
+      // Flush a pending MD autosave first (so we don't lose the last keystrokes),
+      // then parse the current textarea content as the source of truth.
+      if (saveDebounce) { clearTimeout(saveDebounce); saveDebounce = null; }
+      const doc = markdownToDoc(mdEditor.value) as JSONContent;
+      mdMode = false;
+      const active = notesStore.get().active;
+      if (active) {
+        await notesStore.updateActiveDoc(doc);
+        await loadNoteIntoEditor(active.id, doc, true);
+      }
+      syncEditorMode(active !== null);
+      setSaveStatus("saved");
+      focusEditorSoon();
+    }
+
+    function toggleMarkdownMode(): void {
+      if (mdMode) void exitMarkdownMode();
+      else void enterMarkdownMode();
     }
 
     // ── save status indicator ("Saving…" → "Saved ✓") ────────────────
@@ -835,17 +954,26 @@ import { site } from "../site.config";
 
       // Editor pane
       const hasActive = state.active !== null;
-      editorHost.classList.toggle("hidden", !hasActive);
+      // Mode-aware surface visibility (Preview = Tiptap host, Markdown = textarea).
+      syncEditorMode(hasActive);
       editorEmptyEl.classList.toggle("hidden", hasActive);
       editorEmptyEl.classList.toggle("flex", !hasActive);
       toolbarEl.classList.toggle("hidden", !hasActive);
       toolbarEl.classList.toggle("flex", hasActive);
 
       if (state.active) {
-        // Load this note's doc into the editor when the selection changes.
-        // (No-op if the editor already holds this note — avoids clobbering the
-        // caret while the user is typing in the same note.)
-        if (editorNoteId !== state.active.id) {
+        if (mdMode) {
+          // In Markdown mode: when the selection changes to a different note,
+          // re-serialize that note into the textarea. (Skip if it's the same
+          // note we're already editing — never clobber the caret mid-type.)
+          if (mdNoteId !== state.active.id) {
+            mdNoteId = state.active.id;
+            mdEditor.value = docToMarkdown(state.active.doc as JSONContent);
+          }
+        } else if (editorNoteId !== state.active.id) {
+          // Preview mode: load this note's doc into the editor when the
+          // selection changes. (No-op if the editor already holds this note —
+          // avoids clobbering the caret while the user is typing in the same note.)
           void loadNoteIntoEditor(state.active.id, state.active.doc);
         }
         pinBtn.setAttribute("aria-pressed", String(state.active.pinned));
@@ -1397,6 +1525,15 @@ import { site } from "../site.config";
       if (active) exportNote(active);
     });
 
+    // Markdown edit-mode toggle + textarea autosave.
+    mdToggleBtn.addEventListener("click", () => {
+      if (!notesStore.get().active) return; // nothing to edit
+      toggleMarkdownMode();
+    });
+    mdEditor.addEventListener("input", () => {
+      if (mdMode) scheduleMdSave(mdEditor.value);
+    });
+
     // Overflow menu open/close.
     function openMoreMenu(): void {
       moreMenu.classList.remove("hidden");
@@ -1560,6 +1697,12 @@ import { site } from "../site.config";
     // simultaneous same-note typing is still last-saver-wins).
     notesStore.emitter.on("remoteActive", ({ id, doc }) => {
       if (saveDebounce) return; // user is actively typing — don't clobber
+      if (mdMode) {
+        // Markdown mode: refresh the textarea from the sibling tab's edit.
+        mdNoteId = id;
+        mdEditor.value = docToMarkdown(doc as JSONContent);
+        return;
+      }
       void loadNoteIntoEditor(id, doc as JSONContent, true);
     });
 
