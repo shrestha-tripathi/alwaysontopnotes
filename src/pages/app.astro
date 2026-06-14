@@ -90,6 +90,31 @@ import { site } from "../site.config";
           class="text-xs text-[var(--color-fg-subtle)] tabular-nums"
           aria-live="polite"
         ></span>
+        {/* Theme toggle — cycles dark → light → system. Icons are swapped in JS
+            (NOT dark:* utilities — this project themes via data-theme, where
+            dark:* would silently no-op). Only one icon is shown at a time. */}
+        <button
+          id="theme-toggle"
+          type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)]"
+          aria-label="Theme"
+          title="Theme"
+        >
+          {/* moon — shown when the active theme is dark */}
+          <svg id="theme-icon-dark" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          </svg>
+          {/* sun — shown when the active theme is light */}
+          <svg id="theme-icon-light" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+          {/* monitor — shown when following the system preference */}
+          <svg id="theme-icon-system" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect width="20" height="14" x="2" y="3" rx="2"></rect>
+            <path d="M8 21h8M12 17v4"></path>
+          </svg>
+        </button>
         {/* Document PiP toggle — pops the app shell into a floating window.
             Hidden by default; the island unhides it only on Chromium 116+. */}
         <button
@@ -473,12 +498,13 @@ import { site } from "../site.config";
     import { searchNotes } from "../lib/searchNotes";
     import { swatchOf, rotationFor, SWATCHES, COLOR_ORDER } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
-    import { isPipSupported, isPipOpen, openPip, closePip } from "../lib/pipWindow";
+    import { isPipSupported, isPipOpen, openPip, closePip, pipWindowRef } from "../lib/pipWindow";
     import { initPipTour } from "../lib/pipTour";
     import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
     import { exportNote, exportAllNotes } from "../lib/exportNotes";
     import { importMarkdownFiles } from "../lib/importNotes";
     import { initPwaInstall } from "../lib/pwaInstall";
+    import { initThemeToggle } from "../lib/themeToggle";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
@@ -1257,6 +1283,20 @@ import { site } from "../site.config";
     // 14-day dismiss cooldown; safe to call before DOM-ready (only attaches
     // listeners + a deferred iOS timer).
     initPwaInstall();
+
+    // Theme toggle (Phase 4 · commit 17). Header button cycling dark → light →
+    // system; persists the choice to aotn:theme, tracks the OS live in system
+    // mode, and re-mirrors data-theme onto an open PiP float. Icons swapped in
+    // JS (data-theme project — dark:* utilities would no-op).
+    initThemeToggle({
+      button: $("theme-toggle"),
+      icons: {
+        dark: document.getElementById("theme-icon-dark"),
+        light: document.getElementById("theme-icon-light"),
+        system: document.getElementById("theme-icon-system"),
+      },
+      pipWindowRef,
+    });
 
     // In-PiP note switcher buttons. Prev = K = up (-1), Next = J = down (+1) —
     // same direction semantics as the keyboard nav they mirror. The title acts

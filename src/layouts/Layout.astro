@@ -107,7 +107,10 @@ const jsonLdWebSite = {
 
     {/*
       Theme bootstrap — runs synchronously BEFORE paint to prevent FOUC.
-      Read saved preference from localStorage; if absent, follow system pref.
+      Tri-state (Phase 4 · commit 17): aotn:theme ∈ {dark, light, system}.
+      `system` (or missing/garbage) follows prefers-color-scheme; explicit
+      dark/light is pinned. We always write a CONCRETE dark|light onto
+      data-theme (never the literal "system", which matches no CSS block).
       Default = dark (the @theme defaults match this).
     */}
     <script is:inline>
@@ -115,7 +118,12 @@ const jsonLdWebSite = {
         try {
           var saved = localStorage.getItem("aotn:theme");
           var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var theme = saved || (systemDark ? "dark" : "light");
+          var theme;
+          if (saved === "dark" || saved === "light") {
+            theme = saved; // pinned
+          } else {
+            theme = systemDark ? "dark" : "light"; // system / missing / garbage
+          }
           document.documentElement.setAttribute("data-theme", theme);
         } catch (e) {
           document.documentElement.setAttribute("data-theme", "dark");
