@@ -147,13 +147,11 @@ import { site } from "../site.config";
 
         {/* The editor surface */}
         <div class="min-h-0 flex-1 overflow-y-auto">
-          <textarea
-            id="editor"
-            class="hidden h-full w-full resize-none bg-transparent p-6 text-[15px] leading-relaxed text-[var(--color-fg)] placeholder:text-[var(--color-fg-subtle)] focus:outline-none"
-            placeholder="Write something…"
-            spellcheck="true"
-            aria-label="Note editor"
-          ></textarea>
+          {/* Tiptap mounts its .ProseMirror into this host on first select. */}
+          <div
+            id="editor-host"
+            class="hidden h-full px-6 py-5"
+          ></div>
 
           {/* No-selection state */}
           <div
@@ -169,6 +167,41 @@ import { site } from "../site.config";
           </div>
         </div>
       </main>
+    </div>
+
+    {/* Floating selection toolbar (Tiptap BubbleMenu host). Hidden until a
+        text selection exists; positioned by @floating-ui via the extension. */}
+    <div
+      id="bubble-menu"
+      class="flex items-center gap-0.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-1 shadow-lg"
+      role="toolbar"
+      aria-label="Text formatting"
+    >
+      <button type="button" data-cmd="bold" title="Bold (Ctrl/Cmd+B)" aria-label="Bold" class="bubble-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z"></path></svg>
+      </button>
+      <button type="button" data-cmd="italic" title="Italic (Ctrl/Cmd+I)" aria-label="Italic" class="bubble-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 4h-9M14 20H5M15 4 9 20"></path></svg>
+      </button>
+      <button type="button" data-cmd="strike" title="Strikethrough" aria-label="Strikethrough" class="bubble-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4H9a3 3 0 0 0-2.83 4M14 12a4 4 0 0 1 0 8H6M4 12h16"></path></svg>
+      </button>
+      <button type="button" data-cmd="code" title="Inline code" aria-label="Inline code" class="bubble-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"></path></svg>
+      </button>
+      <span class="mx-0.5 h-5 w-px bg-[var(--color-border)]" aria-hidden="true"></span>
+      <button type="button" data-cmd="link" title="Add/edit link (Ctrl/Cmd+K)" aria-label="Add link" class="bubble-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      </button>
+      {/* Text color — 5 quick swatches + clear */}
+      <span class="mx-0.5 h-5 w-px bg-[var(--color-border)]" aria-hidden="true"></span>
+      <div class="flex items-center gap-0.5" role="group" aria-label="Text color">
+        <button type="button" data-color="#ef4444" title="Red text" aria-label="Red text" class="bubble-swatch" style="background:#ef4444"></button>
+        <button type="button" data-color="#f59e0b" title="Amber text" aria-label="Amber text" class="bubble-swatch" style="background:#f59e0b"></button>
+        <button type="button" data-color="#22c55e" title="Green text" aria-label="Green text" class="bubble-swatch" style="background:#22c55e"></button>
+        <button type="button" data-color="#3b82f6" title="Blue text" aria-label="Blue text" class="bubble-swatch" style="background:#3b82f6"></button>
+        <button type="button" data-color="" title="Default color" aria-label="Clear color" class="bubble-btn text-[11px] font-semibold">A</button>
+      </div>
     </div>
 
     {/* Undo-delete toast (single, replaces — never stacks) */}
@@ -194,6 +227,8 @@ import { site } from "../site.config";
     import { searchNotes } from "../lib/searchNotes";
     import { swatchOf, rotationFor } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
+    import type { Editor } from "@tiptap/core";
+    import type { JSONContent } from "../lib/types";
 
     // ── element handles ───────────────────────────────────────────────
     const $ = <T extends HTMLElement = HTMLElement>(id: string): T =>
@@ -203,14 +238,127 @@ import { site } from "../site.config";
     const listEmptyEl = $("list-empty");
     const searchEl = $<HTMLInputElement>("search-input");
     const newBtn = $<HTMLButtonElement>("new-note-btn");
-    const editorEl = $<HTMLTextAreaElement>("editor");
+    const editorHost = $("editor-host");
     const editorEmptyEl = $("editor-empty");
     const toolbarEl = $("editor-toolbar");
     const pinBtn = $<HTMLButtonElement>("pin-btn");
     const deleteBtn = $<HTMLButtonElement>("delete-btn");
+    const bubbleEl = $("bubble-menu");
     const toastEl = $("toast");
     const toastMsg = $("toast-msg");
     const toastAction = $<HTMLButtonElement>("toast-action");
+
+    // ── Tiptap editor (lazy — created on first note select) ───────────
+    let editor: Editor | null = null;
+    let editorNoteId: string | null = null;   // which note the editor currently holds
+    let applyingProgrammatic = false;          // guard: ignore onUpdate during setContent
+    let saveDebounce: ReturnType<typeof setTimeout> | null = null;
+    let savedFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
+    async function ensureEditor(): Promise<Editor> {
+      if (editor) return editor;
+      // Lazy-load Tiptap so the sidebar paints before the editor chunk arrives.
+      const { makeEditor } = await import("../lib/tiptapSetup");
+      editor = makeEditor({
+        element: editorHost,
+        content: { type: "doc", content: [{ type: "paragraph" }] },
+        bubbleElement: bubbleEl,
+        onUpdate: (doc: JSONContent) => {
+          if (applyingProgrammatic) return; // setContent shouldn't trigger a save
+          scheduleSave(doc);
+        },
+      });
+      wireBubbleToolbar(editor);
+      return editor;
+    }
+
+    /** Load a note's doc into the editor (create editor on first use). */
+    async function loadNoteIntoEditor(noteId: string, doc: JSONContent): Promise<void> {
+      const ed = await ensureEditor();
+      if (editorNoteId === noteId) return; // already showing this note
+      editorNoteId = noteId;
+      applyingProgrammatic = true;
+      // `false` = don't emit an update transaction for this programmatic set.
+      ed.commands.setContent(doc as Record<string, unknown>, { emitUpdate: false });
+      applyingProgrammatic = false;
+    }
+
+    /** 500ms debounced autosave → store.updateActiveDoc. */
+    function scheduleSave(doc: JSONContent): void {
+      setSaveStatus("saving");
+      if (saveDebounce) clearTimeout(saveDebounce);
+      saveDebounce = setTimeout(() => void notesStore.updateActiveDoc(doc), 500);
+    }
+
+    // ── save status indicator ("Saving…" → "Saved ✓") ────────────────
+    type SaveStatus = "idle" | "saving" | "saved";
+    function setSaveStatus(s: SaveStatus): void {
+      const el = $("save-status");
+      if (savedFlashTimer) { clearTimeout(savedFlashTimer); savedFlashTimer = null; }
+      if (s === "saving") {
+        el.textContent = "Saving…";
+        el.style.color = "var(--color-fg-subtle)";
+      } else if (s === "saved") {
+        el.textContent = "Saved ✓";
+        el.style.color = "var(--color-success)";
+        // Fade back to idle after a moment.
+        savedFlashTimer = setTimeout(() => { el.textContent = ""; }, 1600);
+      } else {
+        el.textContent = "";
+      }
+    }
+
+    // ── bubble toolbar wiring ──────────────────────────────────────────
+    function wireBubbleToolbar(ed: Editor): void {
+      bubbleEl.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => e.preventDefault()); // keep selection
+        btn.addEventListener("click", () => {
+          const cmd = btn.dataset.cmd;
+          const chain = ed.chain().focus();
+          if (cmd === "bold") chain.toggleBold().run();
+          else if (cmd === "italic") chain.toggleItalic().run();
+          else if (cmd === "strike") chain.toggleStrike().run();
+          else if (cmd === "code") chain.toggleCode().run();
+          else if (cmd === "link") toggleLink(ed);
+          syncBubbleActive(ed);
+        });
+      });
+      bubbleEl.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((btn) => {
+        btn.addEventListener("mousedown", (e) => e.preventDefault());
+        btn.addEventListener("click", () => {
+          const color = btn.dataset.color ?? "";
+          const chain = ed.chain().focus();
+          if (color) chain.setColor(color).run();
+          else chain.unsetColor().run();
+        });
+      });
+      // Reflect active marks on selection change.
+      ed.on("selectionUpdate", () => syncBubbleActive(ed));
+      ed.on("transaction", () => syncBubbleActive(ed));
+    }
+
+    function syncBubbleActive(ed: Editor): void {
+      const map: Record<string, string> = {
+        bold: "bold", italic: "italic", strike: "strike", code: "code", link: "link",
+      };
+      bubbleEl.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((btn) => {
+        const mark = map[btn.dataset.cmd ?? ""];
+        const active = mark ? ed.isActive(mark) : false;
+        btn.classList.toggle("is-active", active);
+      });
+    }
+
+    function toggleLink(ed: Editor): void {
+      if (ed.isActive("link")) {
+        ed.chain().focus().unsetLink().run();
+        return;
+      }
+      const prev = (ed.getAttributes("link").href as string) ?? "";
+      const url = window.prompt("Link URL", prev || "https://");
+      if (url === null) return;          // cancelled
+      if (url === "") { ed.chain().focus().unsetLink().run(); return; }
+      ed.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+    }
 
     // ── render ────────────────────────────────────────────────────────
     let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -277,27 +425,27 @@ import { site } from "../site.config";
 
       // Editor pane
       const hasActive = state.active !== null;
-      editorEl.classList.toggle("hidden", !hasActive);
-      editorEl.classList.toggle("block", hasActive);
+      editorHost.classList.toggle("hidden", !hasActive);
       editorEmptyEl.classList.toggle("hidden", hasActive);
       editorEmptyEl.classList.toggle("flex", !hasActive);
       toolbarEl.classList.toggle("hidden", !hasActive);
       toolbarEl.classList.toggle("flex", hasActive);
 
       if (state.active) {
-        // Only overwrite the textarea if it's out of sync (avoid clobbering
-        // the caret while the user is actively typing).
-        if (editorEl.value !== state.active.plainText && document.activeElement !== editorEl) {
-          editorEl.value = state.active.plainText;
+        // Load this note's doc into the editor when the selection changes.
+        // (No-op if the editor already holds this note — avoids clobbering the
+        // caret while the user is typing in the same note.)
+        if (editorNoteId !== state.active.id) {
+          void loadNoteIntoEditor(state.active.id, state.active.doc);
         }
         pinBtn.setAttribute("aria-pressed", String(state.active.pinned));
         pinBtn.style.color = state.active.pinned ? "var(--color-accent-strong)" : "";
         pinBtn.title = state.active.pinned ? "Unpin note" : "Pin note";
+      } else {
+        // Deselected — clear the editor's bound note so re-selecting reloads.
+        editorNoteId = null;
+        bubbleEl.style.visibility = "hidden";
       }
-
-      // Save status
-      const status = $("save-status");
-      status.textContent = state.saving ? "Saving…" : "";
     }
 
     // ── toast ──────────────────────────────────────────────────────────
@@ -315,10 +463,19 @@ import { site } from "../site.config";
     const trim = (s: string): string => (s.length > 28 ? s.slice(0, 28) + "…" : s);
 
     // ── event wiring ────────────────────────────────────────────────────
+
+    /** Focus the editor once it exists (created lazily on first select). */
+    function focusEditorSoon(): void {
+      const tryFocus = () => {
+        if (editor) editor.commands.focus("end");
+        else requestAnimationFrame(tryFocus);
+      };
+      requestAnimationFrame(tryFocus);
+    }
+
     newBtn.addEventListener("click", () => {
       void notesStore.createNote();
-      // Focus the editor for immediate typing (same gesture chain).
-      requestAnimationFrame(() => editorEl.focus());
+      focusEditorSoon();
     });
 
     searchEl.addEventListener("input", () => notesStore.setQuery(searchEl.value));
@@ -333,16 +490,8 @@ import { site } from "../site.config";
       if (li?.dataset.id) {
         e.preventDefault();
         void notesStore.selectNote(li.dataset.id);
-        requestAnimationFrame(() => editorEl.focus());
+        focusEditorSoon();
       }
-    });
-
-    let saveDebounce: ReturnType<typeof setTimeout> | null = null;
-    editorEl.addEventListener("input", () => {
-      // Commit 6: debounce light; commit 8 formalizes the 500ms autosave.
-      if (saveDebounce) clearTimeout(saveDebounce);
-      const text = editorEl.value;
-      saveDebounce = setTimeout(() => void notesStore.updateActiveText(text), 250);
     });
 
     pinBtn.addEventListener("click", () => {
@@ -362,6 +511,22 @@ import { site } from "../site.config";
 
     notesStore.emitter.on("pendingDelete", ({ title }) => showUndoToast(title));
 
+    // Flash "Saved ✓" when a persist completes (store flips saving true→false).
+    let wasSaving = false;
+    notesStore.emitter.on("change", (s) => {
+      if (wasSaving && !s.saving) setSaveStatus("saved");
+      wasSaving = s.saving;
+    });
+
+    // Surface a persist failure as a toast.
+    notesStore.emitter.on("error", ({ message }) => {
+      toastMsg.textContent = message;
+      toastAction.textContent = "";
+      toastEl.classList.remove("hidden");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.add("hidden"), 4000);
+    });
+
     // Keyboard: N = new, / = search (when not typing)
     document.addEventListener("keydown", (e) => {
       const el = document.activeElement as HTMLElement | null;
@@ -369,20 +534,26 @@ import { site } from "../site.config";
         el &&
         (el.tagName === "INPUT" ||
           el.tagName === "TEXTAREA" ||
-          el.isContentEditable);
+          el.isContentEditable); // .ProseMirror is contentEditable → covered
       if (typing) return;
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
         void notesStore.createNote();
-        requestAnimationFrame(() => editorEl.focus());
+        focusEditorSoon();
       } else if (e.key === "/") {
         e.preventDefault();
         searchEl.focus();
       }
     });
 
-    // Flush any pending hard-delete before the tab unloads.
-    window.addEventListener("pagehide", () => notesStore.flushPendingDelete());
+    // Flush any pending hard-delete + pending save before the tab unloads.
+    window.addEventListener("pagehide", () => {
+      if (saveDebounce && editor) {
+        clearTimeout(saveDebounce);
+        void notesStore.updateActiveDoc(editor.getJSON() as JSONContent);
+      }
+      notesStore.flushPendingDelete();
+    });
 
     // ── boot ────────────────────────────────────────────────────────────
     notesStore.emitter.on("change", render);
