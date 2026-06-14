@@ -905,24 +905,26 @@ html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scr
   background-color: color-mix(in srgb, var(--note-ink) 55%, transparent);
 }
 
-/* ⚠️ PiP scrollbar drag fix (root cause — user-confirmed regression). The
-   native scrollbar IS draggable inside a Document-PiP window; a custom
-   CSS-painted `::-webkit-scrollbar` is NOT (paints but can't be grabbed). And
-   in Chromium an element flips to custom mode the moment ANY ::-webkit-scrollbar
-   author rule MATCHES it — even `all: revert` or `{}`. So we must NOT emit a
-   single matching ::-webkit-scrollbar rule inside the float: every such rule is
-   scoped `html:not(.pip-mode)` up in the base block. Here we ONLY set the
-   STANDARD scrollbar props (scrollbar-width/scrollbar-color), which theme the
-   genuine native bar thin + on-brand WITHOUT triggering custom mode — so it
-   stays draggable. DO NOT add any `:where(.pip-mode) …::-webkit-scrollbar…`
-   rule here; the match alone re-breaks drag (that was the previous failed fix). */
+/* ⚠️ PiP scrollbar drag fix (ROOT CAUSE — confirmed by runtime measurement).
+   The bug was NEVER the custom `::-webkit-scrollbar` (that theory drove 3 failed
+   fixes). The real offender is the STANDARD `scrollbar-width: thin` prop: inside
+   a Document-PiP float Chromium renders `thin` as a ~10px overlay-style bar whose
+   thumb is too narrow to grab + drag. The default `scrollbar-width: auto` renders
+   the ~15px solid native bar — the one the user confirmed WAS draggable before any
+   theming landed. Measured in a simulated float: thin → barWidth 10px, auto →
+   15px. So in the float we MUST use `scrollbar-width: auto` (wide, grabbable),
+   NOT thin. `scrollbar-color` is fine to keep — color never affects draggability.
+   The wide two-pane app keeps `thin` (wheel/trackpad reach makes a slim bar fine
+   there; you rarely drag it). DO NOT set `scrollbar-width: thin` (or any
+   ::-webkit-scrollbar rule) inside `.pip-mode` — either one shrinks/breaks the
+   grab target. */
 :where(.pip-mode) .nice-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--color-fg) 35%, transparent) transparent;
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in srgb, var(--color-fg) 45%, transparent) transparent;
 }
 /* On the tinted editor surface in PiP, the native thumb follows the note ink. */
 :where(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll {
-  scrollbar-color: color-mix(in srgb, var(--note-ink) 45%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--note-ink) 55%, transparent) transparent;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
