@@ -829,45 +829,62 @@ html[data-theme="dark"] .sticky-card:hover {
 
 /* ─────────────────────────────────────────────────────────────────────
  * Native-notes scrollbars (.nice-scroll). The default OS scrollbar (chunky,
- * with arrow buttons, full-contrast track) breaks the sticky-note illusion —
- * especially in the PiP float. Replace it with a thin, rounded, auto-dimming
- * thumb and no track/buttons. On the tinted editor surface the thumb picks up
- * the note ink so it reads as part of the paper; elsewhere it's a neutral.
- * Firefox uses the standard scrollbar-width/color props (no ::-webkit access).
+ * with arrow buttons, full-contrast track) breaks the sticky-note illusion.
+ * Replace it with a thin, rounded, auto-dimming thumb and no track/buttons.
+ * On the tinted editor surface the thumb picks up the note ink so it reads as
+ * part of the paper; elsewhere it's a neutral. Firefox uses the standard
+ * scrollbar-width/color props (no ::-webkit access).
+ *
+ * ⚠️ PiP DRAG FIX (root cause, user-confirmed regression): In Chromium an
+ * element switches to a CUSTOM (CSS-painted) scrollbar the instant ANY
+ * ::-webkit-scrollbar author rule MATCHES it — regardless of the VALUES. Even
+ * `all: revert` or an empty `{}` keeps custom mode ON, because it's the MATCH
+ * that flips the render path, not the declarations. Custom scrollbars have
+ * broken drag hit-testing inside a Document Picture-in-Picture window (the
+ * thumb paints but can't be grabbed); the NATIVE scrollbar IS draggable there
+ * (confirmed: the plain default bar dragged fine in the float and broke only
+ * once these custom rules landed). So EVERY ::-webkit-scrollbar rule below is
+ * scoped to `html:not(.pip-mode)` — the origin tab only. Inside the float
+ * (<html class="pip-mode">) NOT ONE ::-webkit-scrollbar rule matches, so the
+ * scroller keeps the genuine native (draggable) scrollbar, themed solely via
+ * the STANDARD scrollbar-width/scrollbar-color props below (which never
+ * trigger custom mode). NEVER add a ::-webkit-scrollbar rule that matches
+ * inside .pip-mode — not even to "reset" it; the match alone re-breaks drag.
  * ─────────────────────────────────────────────────────────────────────── */
 .nice-scroll {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-fg) 22%, transparent) transparent;
 }
-.nice-scroll::-webkit-scrollbar {
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
-.nice-scroll::-webkit-scrollbar-track {
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
-.nice-scroll::-webkit-scrollbar-thumb {
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--color-fg) 20%, transparent);
   border-radius: 9999px;
   /* Transparent border = padding that insets the thumb so it floats inside the
      track with a rounded-pill look (the classic native-feel trick). */
   border: 2px solid transparent;
   background-clip: padding-box;
-  /* Floor the thumb height so it stays a grabbable target even on very long
-     notes — without this a tall note shrinks the thumb to an un-draggable
-     sliver (the root cause of the "can't drag the scrollbar in the float" bug). */
+  /* Floor the thumb height so a tall note doesn't shrink it to a sliver. (NOTE:
+     this is NOT the PiP drag fix — drag was never a sizing problem; see the
+     header note above. Kept only because a comfortable min thumb is nicer in
+     the wide two-pane app.) */
   min-height: 44px;
   transition: background-color 140ms ease;
 }
-.nice-scroll::-webkit-scrollbar-thumb:hover {
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--color-fg) 38%, transparent);
 }
-.nice-scroll::-webkit-scrollbar-thumb:active {
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb:active {
   background-color: color-mix(in srgb, var(--color-fg) 50%, transparent);
 }
 /* No arrow buttons / no corner — keep it clean. */
-.nice-scroll::-webkit-scrollbar-button,
-.nice-scroll::-webkit-scrollbar-corner {
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar-button,
+html:not(.pip-mode) .nice-scroll::-webkit-scrollbar-corner {
   display: none;
 }
 
@@ -878,41 +895,30 @@ html[data-theme="dark"] .sticky-card:hover {
 #app-root[style*="--note-bg"] main .nice-scroll {
   scrollbar-color: color-mix(in srgb, var(--note-ink) 28%, transparent) transparent;
 }
-#app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb {
+html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb {
   background-color: color-mix(in srgb, var(--note-ink) 26%, transparent);
 }
-#app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:hover {
+html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:hover {
   background-color: color-mix(in srgb, var(--note-ink) 42%, transparent);
 }
-#app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:active {
+html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scrollbar-thumb:active {
   background-color: color-mix(in srgb, var(--note-ink) 55%, transparent);
 }
 
-/* ⚠️ PiP scrollbar drag fix (the real one). Custom CSS-painted
-   `::-webkit-scrollbar` thumbs PAINT but don't receive DRAG hit-testing inside a
-   Document Picture-in-Picture window (a Chromium quirk — the composited custom
-   bar isn't wired to the float's input). Symptom: the bar shows but you can't
-   grab + drag it. An earlier fix enlarged the thumb (min-height/width) and
-   changed NOTHING — proving the issue is interactivity, not size. The fix is to
-   turn OFF the custom webkit scrollbar in the float and fall back to the NATIVE
-   scrollbar, which IS draggable in PiP; we still style it via the standard
-   `scrollbar-width`/`scrollbar-color` props (Firefox + the PiP native bar both
-   honor these), so it stays thin + on-brand. The wide two-pane app keeps the
-   pretty custom bar above. Scoped to `:where(.pip-mode)`. */
+/* ⚠️ PiP scrollbar drag fix (root cause — user-confirmed regression). The
+   native scrollbar IS draggable inside a Document-PiP window; a custom
+   CSS-painted `::-webkit-scrollbar` is NOT (paints but can't be grabbed). And
+   in Chromium an element flips to custom mode the moment ANY ::-webkit-scrollbar
+   author rule MATCHES it — even `all: revert` or `{}`. So we must NOT emit a
+   single matching ::-webkit-scrollbar rule inside the float: every such rule is
+   scoped `html:not(.pip-mode)` up in the base block. Here we ONLY set the
+   STANDARD scrollbar props (scrollbar-width/scrollbar-color), which theme the
+   genuine native bar thin + on-brand WITHOUT triggering custom mode — so it
+   stays draggable. DO NOT add any `:where(.pip-mode) …::-webkit-scrollbar…`
+   rule here; the match alone re-breaks drag (that was the previous failed fix). */
 :where(.pip-mode) .nice-scroll {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-fg) 35%, transparent) transparent;
-}
-/* Reset every custom webkit pseudo back to the native bar inside the float so
-   Chromium renders (and hit-tests) its own draggable scrollbar. */
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar,
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-track,
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb,
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb:hover,
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-thumb:active,
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-button,
-:where(.pip-mode) .nice-scroll::-webkit-scrollbar-corner {
-  all: revert;
 }
 /* On the tinted editor surface in PiP, the native thumb follows the note ink. */
 :where(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll {
