@@ -905,26 +905,40 @@ html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scr
   background-color: color-mix(in srgb, var(--note-ink) 55%, transparent);
 }
 
-/* ⚠️ PiP scrollbar drag fix (ROOT CAUSE — confirmed by runtime measurement).
-   The bug was NEVER the custom `::-webkit-scrollbar` (that theory drove 3 failed
-   fixes). The real offender is the STANDARD `scrollbar-width: thin` prop: inside
-   a Document-PiP float Chromium renders `thin` as a ~10px overlay-style bar whose
-   thumb is too narrow to grab + drag. The default `scrollbar-width: auto` renders
-   the ~15px solid native bar — the one the user confirmed WAS draggable before any
-   theming landed. Measured in a simulated float: thin → barWidth 10px, auto →
-   15px. So in the float we MUST use `scrollbar-width: auto` (wide, grabbable),
-   NOT thin. `scrollbar-color` is fine to keep — color never affects draggability.
-   The wide two-pane app keeps `thin` (wheel/trackpad reach makes a slim bar fine
-   there; you rarely drag it). DO NOT set `scrollbar-width: thin` (or any
-   ::-webkit-scrollbar rule) inside `.pip-mode` — either one shrinks/breaks the
-   grab target. */
+/* ⚠️ PiP scrollbar drag fix — FULL root cause (two compounding offenders, each
+   found by runtime measurement; do NOT revert to a partial fix).
+
+   Inside a Document-PiP float Chromium will only give a fully-draggable thumb on
+   the GENUINE native scrollbar. Anything that flips the element onto Chromium's
+   CSS-painted ("custom") scrollbar path breaks drag hit-testing in PiP — the
+   thumb paints on the right but its grab region is offset to the LEFT, so the bar
+   only catches at its extreme-left edge and is dead through the centre/right.
+
+   TWO independent triggers switch on the custom path — BOTH must be neutralised:
+     1. `scrollbar-width: thin`  → fix #1 (width:auto). Necessary, NOT sufficient.
+     2. `scrollbar-color: <any non-auto value>` → the residual offender. A custom
+        color alone keeps the bar CSS-painted even with width:auto, which is why
+        after fix #1 it became draggable-but-only-from-the-left. Measured: with a
+        custom scrollbar-color the bar stays on the painted path; `auto` returns
+        the true native bar.
+
+   So in `.pip-mode` the scroller MUST be 100% native: scrollbar-width:auto AND
+   scrollbar-color:auto. The base `.nice-scroll` rule sets BOTH to custom values,
+   so we have to explicitly reset BOTH here. TRADE-OFF (accepted): the float's bar
+   reverts to the browser's default neutral color — a custom-tinted bar and a
+   guaranteed-native-draggable bar are mutually exclusive in the standard
+   scrollbar API. Draggability wins in the float (you grab it constantly there).
+   The wide two-pane app keeps the thin tinted bar (you wheel/trackpad it; rarely
+   drag). NEVER set scrollbar-width:thin, a custom scrollbar-color, OR any
+   ::-webkit-scrollbar rule inside `.pip-mode` — any one of them re-breaks drag. */
 :where(.pip-mode) .nice-scroll {
   scrollbar-width: auto;
-  scrollbar-color: color-mix(in srgb, var(--color-fg) 45%, transparent) transparent;
+  scrollbar-color: auto;
 }
-/* On the tinted editor surface in PiP, the native thumb follows the note ink. */
+/* The tinted-surface override (#app-root[--note-bg]) also sets a custom color and
+   applies in PiP too — reset it to native here so the float stays draggable. */
 :where(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll {
-  scrollbar-color: color-mix(in srgb, var(--note-ink) 55%, transparent) transparent;
+  scrollbar-color: auto;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
