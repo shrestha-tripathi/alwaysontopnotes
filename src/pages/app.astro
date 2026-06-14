@@ -478,6 +478,7 @@ import { site } from "../site.config";
     import { hasWelcomed, markWelcomed, welcomeDoc, WELCOME_COLOR } from "../lib/welcome";
     import { exportNote, exportAllNotes } from "../lib/exportNotes";
     import { importMarkdownFiles } from "../lib/importNotes";
+    import { initPwaInstall } from "../lib/pwaInstall";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
@@ -1250,6 +1251,12 @@ import { site } from "../site.config";
       // note. No-ops for returning users / unsupported browsers.
       initPipTour();
     }
+
+    // PWA install pill (Phase 4 · commit 16). Captures beforeinstallprompt /
+    // shows the custom install UI / iOS A2HS hint. Self-gates on installed +
+    // 14-day dismiss cooldown; safe to call before DOM-ready (only attaches
+    // listeners + a deferred iOS timer).
+    initPwaInstall();
 
     // In-PiP note switcher buttons. Prev = K = up (-1), Next = J = down (+1) —
     // same direction semantics as the keyboard nav they mirror. The title acts

@@ -77,7 +77,7 @@ const jsonLdWebSite = {
 
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#facc15" media="(prefers-color-scheme: light)" />
@@ -146,6 +146,22 @@ const jsonLdWebSite = {
         </script>
       </>
     )}
+
+    {/*
+      Service worker registration (Phase 4 · commit 16). Registers on `load`
+      so it never competes with first paint. The SW is a real offline app-shell
+      (precache + cache-first) — see public/sw.js. Registration failures are
+      non-fatal (older browsers / disabled SW) and only warn.
+    */}
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("/sw.js").catch(function (err) {
+            console.warn("[SW] registration failed:", err);
+          });
+        });
+      }
+    </script>
   </head>
   <body>
     <slot />

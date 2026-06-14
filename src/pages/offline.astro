@@ -1,0 +1,84 @@
+---
+/**
+ * Offline fallback page (Phase 4 · commit 16). Served by the service worker as
+ * the last-resort navigation response when the network is down AND the
+ * requested page isn't cached. Reassures the user their notes are safe locally
+ * and routes them back into the app (which boots fully from cache + IndexedDB).
+ * noindex — infra page, never a search result.
+ */
+import Layout from "../layouts/Layout.astro";
+import { site } from "../site.config";
+---
+
+<Layout title="Offline" noindex={true}>
+  <main class="offline">
+    <svg class="offline-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="4" y="6" width="24" height="24" rx="3" fill="#facc15" transform="rotate(-4 16 18)"></rect>
+      <rect x="4" y="6" width="24" height="4" rx="1" fill="#eab308" transform="rotate(-4 16 18)"></rect>
+    </svg>
+    <h1>You&rsquo;re offline</h1>
+    <p>
+      No connection right now &mdash; but your notes are safe on this device.
+      {site.name} works fully offline. Reopen the app and keep writing; everything
+      syncs back to local storage instantly.
+    </p>
+    <a class="offline-btn" href="/app">Open my notes</a>
+  </main>
+</Layout>
+
+<style>
+  .offline {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 1rem;
+    padding: 2rem 1.25rem;
+    max-width: 30rem;
+    margin: 0 auto;
+    color: var(--color-fg);
+  }
+  .offline-mark {
+    width: 56px;
+    height: 56px;
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
+  }
+  .offline h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .offline p {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--color-fg-muted);
+    margin: 0;
+  }
+  .offline-btn {
+    margin-top: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    background: var(--color-accent, #facc15);
+    color: #1c1917;
+    text-decoration: none;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  }
+  .offline-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .offline-btn {
+      transition: none;
+    }
+  }
+</style>
