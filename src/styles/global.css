@@ -305,10 +305,16 @@ html[data-theme="dark"] .sticky-card:hover {
     0 24px 48px -10px rgba(0, 0, 0, 0.65);
 }
 @media (prefers-reduced-motion: reduce) {
-  .sticky-card,
-  .sticky-card:hover {
-    transform: none;
+  /* A static resting tilt is NOT motion — keep it (battery-saver / "reduce
+     animations" must not flatten the sticky-note look). Suppress only the
+     animated transform transition + the hover lift/straighten (actual
+     movement). The box-shadow hover cue still fires — a shadow change isn't
+     motion, so hover stays legible. */
+  .sticky-card {
     transition: box-shadow 0.16s ease;
+  }
+  .sticky-card:hover {
+    transform: rotate(var(--rot));
   }
 }
 
