@@ -110,6 +110,17 @@ import { site } from "../site.config";
             Your fridge is empty.<br />Press <kbd class="rounded border border-[var(--color-border)] bg-[var(--color-bg-muted)] px-1.5 py-0.5 text-xs font-medium">N</kbd> to start.
           </p>
         </div>
+
+        {/* No-results state (toggled by the island when a search matches nothing) */}
+        <div
+          id="list-no-results"
+          class="hidden flex-1 flex-col items-center justify-center gap-3 p-6 text-center"
+        >
+          <div class="text-3xl">🔍</div>
+          <p class="text-sm text-[var(--color-fg-muted)]">
+            No notes match “<span id="no-results-query" class="font-semibold text-[var(--color-fg)]"></span>”.
+          </p>
+        </div>
       </aside>
 
       {/* ── Editor pane ─────────────────────────────────────── */}
@@ -265,6 +276,8 @@ import { site } from "../site.config";
 
     const listEl = $<HTMLUListElement>("note-list");
     const listEmptyEl = $("list-empty");
+    const listNoResultsEl = $("list-no-results");
+    const noResultsQueryEl = $("no-results-query");
     const searchEl = $<HTMLInputElement>("search-input");
     const newBtn = $<HTMLButtonElement>("new-note-btn");
     const editorHost = $("editor-host");
@@ -407,64 +420,141 @@ import { site } from "../site.config";
     // ── render ────────────────────────────────────────────────────────
     let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
+    /**
+     * Append `text` to `el`, wrapping every case-insensitive occurrence of
+     * `needle` in a <mark>. XSS-safe: all text goes through textContent /
+     * createTextNode — never innerHTML — so a note titled `<img onerror>` stays
+     * inert. Empty needle → plain text fast-path.
+     */
+    function highlightInto(el: HTMLElement, text: string, needle: string): void {
+      if (!needle) {
+        el.textContent = text;
+        return;
+      }
+      const lower = text.toLowerCase();
+      let from = 0;
+      let idx = lower.indexOf(needle);
+      if (idx === -1) {
+        el.textContent = text;
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      while (idx !== -1) {
+        if (idx > from) frag.appendChild(document.createTextNode(text.slice(from, idx)));
+        const mark = document.createElement("mark");
+        mark.textContent = text.slice(idx, idx + needle.length);
+        frag.appendChild(mark);
+        from = idx + needle.length;
+        idx = lower.indexOf(needle, from);
+      }
+      if (from < text.length) frag.appendChild(document.createTextNode(text.slice(from)));
+      el.appendChild(frag);
+    }
+
+    /** Build one sticky-note card <li>. `needle` (lowercased) highlights hits. */
+    function buildCard(
+      entry: ReturnType<typeof notesStore.get>["index"][number],
+      activeId: string | null,
+      needle: string,
+    ): HTMLLIElement {
+      const sw = swatchOf(entry.color);
+      const li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", String(entry.id === activeId));
+      li.dataset.id = entry.id;
+      li.tabIndex = 0;
+      const selected = entry.id === activeId;
+      li.className =
+        "sticky-card group relative cursor-pointer rounded-lg border p-3 " +
+        (selected ? "ring-2 ring-[var(--color-accent)]" : "");
+      li.style.backgroundColor = sw.bg;
+      li.style.borderColor = sw.edge;
+      li.style.color = sw.ink;
+      // Tilt lives in a custom prop so CSS can compose it with a hover lift.
+      li.style.setProperty("--rot", `${rotationFor(entry.id)}deg`);
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "flex items-start gap-1.5";
+
+      if (entry.pinned) {
+        const pin = document.createElement("span");
+        pin.textContent = "📌";
+        pin.className = "shrink-0 text-xs leading-5";
+        pin.setAttribute("aria-label", "Pinned");
+        titleRow.appendChild(pin);
+      }
+
+      const title = document.createElement("div");
+      title.className = "min-w-0 flex-1 truncate text-sm font-semibold";
+      highlightInto(title, entry.title || "Untitled", needle);
+      titleRow.appendChild(title);
+
+      li.appendChild(titleRow);
+
+      if (entry.preview) {
+        const prev = document.createElement("div");
+        prev.className = "mt-1 line-clamp-2 text-xs opacity-70";
+        highlightInto(prev, entry.preview, needle);
+        li.appendChild(prev);
+      }
+
+      return li;
+    }
+
+    /** A non-selectable group label row (e.g. "Pinned" / "Notes"). */
+    function makeSectionHeader(label: string, count: number): HTMLLIElement {
+      const li = document.createElement("li");
+      li.setAttribute("role", "presentation");
+      li.className = "section-header";
+      const text = document.createElement("span");
+      text.textContent = label;
+      const badge = document.createElement("span");
+      badge.className = "section-count";
+      badge.textContent = String(count);
+      li.append(text, badge);
+      return li;
+    }
+
     function render(state: ReturnType<typeof notesStore.get>): void {
+      const query = state.query.trim();
+      const needle = query.toLowerCase();
+      const searching = needle.length > 0;
       const visible = searchNotes(state.index, state.query);
 
-      // List vs empty
+      // List vs empty vs no-results:
+      //  - no notes at all → "fridge is empty" onboarding state
+      //  - searching with zero matches → "no matches" state
+      //  - otherwise → the list
       const hasNotes = state.index.length > 0;
-      listEl.classList.toggle("hidden", !hasNotes);
-      listEmptyEl.classList.toggle("hidden", hasNotes);
+      const noMatches = hasNotes && searching && visible.length === 0;
+      const showList = hasNotes && !noMatches;
+      listEl.classList.toggle("hidden", !showList);
+      listEmptyEl.classList.toggle("hidden", hasNotes); // only for truly-empty
       listEmptyEl.classList.toggle("flex", !hasNotes);
+      listNoResultsEl.classList.toggle("hidden", !noMatches);
+      listNoResultsEl.classList.toggle("flex", noMatches);
+      if (noMatches) noResultsQueryEl.textContent = query;
 
-      // Build the list (XSS-safe — all user text via textContent)
-      listEl.replaceChildren(
-        ...visible.map((entry) => {
-          const sw = swatchOf(entry.color);
-          const li = document.createElement("li");
-          li.setAttribute("role", "option");
-          li.setAttribute("aria-selected", String(entry.id === state.activeId));
-          li.dataset.id = entry.id;
-          li.tabIndex = 0;
-          const selected = entry.id === state.activeId;
-          li.className =
-            "sticky-card group relative cursor-pointer rounded-lg border p-3 " +
-            (selected
-              ? "ring-2 ring-[var(--color-accent)]"
-              : "");
-          li.style.backgroundColor = sw.bg;
-          li.style.borderColor = sw.edge;
-          li.style.color = sw.ink;
-          // Tilt lives in a custom prop so CSS can compose it with a hover lift.
-          li.style.setProperty("--rot", `${rotationFor(entry.id)}deg`);
-
-          const titleRow = document.createElement("div");
-          titleRow.className = "flex items-start gap-1.5";
-
-          if (entry.pinned) {
-            const pin = document.createElement("span");
-            pin.textContent = "📌";
-            pin.className = "shrink-0 text-xs leading-5";
-            pin.setAttribute("aria-label", "Pinned");
-            titleRow.appendChild(pin);
+      // Build the rows. While searching we keep pure rank order (no grouping —
+      // relevance matters more than pin status mid-search). Otherwise we group
+      // Pinned above the rest, each with a labeled header (only when pins exist).
+      const rows: HTMLLIElement[] = [];
+      if (showList) {
+        if (!searching) {
+          const pinned = visible.filter((e) => e.pinned);
+          const others = visible.filter((e) => !e.pinned);
+          if (pinned.length > 0) {
+            rows.push(makeSectionHeader("Pinned", pinned.length));
+            for (const e of pinned) rows.push(buildCard(e, state.activeId, needle));
+            // Only show the "Notes" header when there's a pinned group above it.
+            if (others.length > 0) rows.push(makeSectionHeader("Notes", others.length));
           }
-
-          const title = document.createElement("div");
-          title.className = "min-w-0 flex-1 truncate text-sm font-semibold";
-          title.textContent = entry.title || "Untitled";
-          titleRow.appendChild(title);
-
-          li.appendChild(titleRow);
-
-          if (entry.preview) {
-            const prev = document.createElement("div");
-            prev.className = "mt-1 line-clamp-2 text-xs opacity-70";
-            prev.textContent = entry.preview;
-            li.appendChild(prev);
-          }
-
-          return li;
-        }),
-      );
+          for (const e of others) rows.push(buildCard(e, state.activeId, needle));
+        } else {
+          for (const e of visible) rows.push(buildCard(e, state.activeId, needle));
+        }
+      }
+      listEl.replaceChildren(...rows);
 
       // Editor pane
       const hasActive = state.active !== null;
@@ -666,6 +756,19 @@ import { site } from "../site.config";
         return;
       }
       const el = document.activeElement as HTMLElement | null;
+      // Escape in the search box: clear the query (if any) then blur. This is a
+      // context-aware Esc — it works WHILE the input is focused, so it must run
+      // before the generic "typing → bail" guard below.
+      if (e.key === "Escape" && el === searchEl) {
+        e.preventDefault();
+        if (searchEl.value) {
+          searchEl.value = "";
+          notesStore.setQuery("");
+        } else {
+          searchEl.blur();
+        }
+        return;
+      }
       const typing =
         el &&
         (el.tagName === "INPUT" ||
@@ -679,6 +782,7 @@ import { site } from "../site.config";
       } else if (e.key === "/") {
         e.preventDefault();
         searchEl.focus();
+        searchEl.select();
       }
     });
 

@@ -349,3 +349,55 @@ html[data-theme="dark"] .sticky-card:hover {
   font-weight: 700;
   color: #1c1917;
 }
+
+/* ============================================================
+   Search highlight + pin grouping (commit 10)
+   ============================================================ */
+/* <mark> sits INSIDE a sticky card whose bg is a literal pastel swatch, so the
+   highlight can't use a theme var — it must read on ALL 8 swatches, including
+   the yellow + cream ones where a plain amber wash vanishes. So instead of a
+   light tint we use a strong, near-opaque amber-600 fill with white-ish text
+   and a darker ring — high enough contrast to pop on every pastel (and on the
+   yellow/cream notes specifically). Verified visually against all swatches. */
+.sticky-card mark {
+  background: #b45309; /* amber-700 — saturated, reads on yellow + cream too */
+  color: #fffbeb; /* warm near-white ink for max legibility on the dark fill */
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 0 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+/* Non-selectable group label between card groups (Pinned / Notes). */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem 0.1rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+  cursor: default;
+  user-select: none;
+}
+/* First header has no top padding (it leads the list). */
+.section-header:first-child {
+  padding-top: 0.1rem;
+}
+.section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.3rem;
+  border-radius: 9999px;
+  background: var(--color-bg-muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-fg-muted);
+}
