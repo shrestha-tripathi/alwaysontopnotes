@@ -38,6 +38,51 @@ import { site } from "../site.config";
         <span class="text-sm font-semibold tracking-tight">{site.name}</span>
       </a>
 
+      {/* In-PiP note switcher — fills the otherwise-empty header strip when the
+          float is open (brand + pip-toggle are hidden in PiP). Lets the user
+          flip between notes WITHOUT bringing the app back, and surfaces the
+          active note's title in DOM we control (the browser's PiP title bar
+          can't be reliably styled). Hidden in the two-pane app; shown only
+          under :where(.pip-mode) via CSS. Buttons reuse navigateList(±1). */}
+      <div
+        id="pip-switcher"
+        class="hidden min-w-0 items-center justify-center gap-1"
+        role="group"
+        aria-label="Switch note"
+      >
+        <button
+          id="pip-prev"
+          type="button"
+          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)] disabled:pointer-events-none disabled:opacity-30"
+          aria-label="Previous note"
+          title="Previous note (K)"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+        </button>
+        <div id="pip-title-clip" class="min-w-0 max-w-[180px] overflow-hidden">
+          <button
+            id="pip-title"
+            type="button"
+            class="block w-full truncate text-center text-[13px] font-semibold leading-7 text-[var(--color-fg)] transition-transform"
+            title="Bring back the full app"
+            aria-label="Active note — click to bring the app back"
+          ></button>
+        </div>
+        <span
+          id="pip-pos"
+          class="shrink-0 text-[11px] tabular-nums text-[var(--color-fg-subtle)]"
+          aria-hidden="true"
+        ></span>
+        <button
+          id="pip-next"
+          type="button"
+          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-bg-muted)] hover:text-[var(--color-fg)] disabled:pointer-events-none disabled:opacity-30"
+          aria-label="Next note"
+          title="Next note (J)"
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+        </button>
+      </div>
       <div class="flex items-center gap-3">
         {/* Save status — wired in commit 8; placeholder reserved now */}
         <span
@@ -64,7 +109,7 @@ import { site } from "../site.config";
             <path d="M22 17h-9"></path>
           </svg>
         </button>
-        <span class="hidden text-xs text-[var(--color-fg-subtle)] sm:inline">
+        <span id="device-badge" class="hidden text-xs text-[var(--color-fg-subtle)] sm:inline">
           🔒 On your device
         </span>
       </div>
@@ -382,6 +427,12 @@ import { site } from "../site.config";
     const toastMsg = $("toast-msg");
     const toastAction = $<HTMLButtonElement>("toast-action");
 
+    // In-PiP note switcher (shown only inside the float; see :where(.pip-mode)).
+    const pipPrevBtn = $<HTMLButtonElement>("pip-prev");
+    const pipNextBtn = $<HTMLButtonElement>("pip-next");
+    const pipTitleBtn = $<HTMLButtonElement>("pip-title");
+    const pipPosEl = $("pip-pos");
+
     // ── Tiptap editor (lazy — created on first note select) ───────────
     let editor: Editor | null = null;
     let editorNoteId: string | null = null;   // which note the editor currently holds
@@ -608,7 +659,6 @@ import { site } from "../site.config";
       const needle = query.toLowerCase();
       const searching = needle.length > 0;
       const visible = searchNotes(state.index, state.query);
-
       // List vs empty vs no-results:
       //  - no notes at all → "fridge is empty" onboarding state
       //  - searching with zero matches → "no matches" state
@@ -692,8 +742,75 @@ import { site } from "../site.config";
         appRoot.style.removeProperty("--note-edge");
         resetThemeColor();
       }
+
+      // Keep the in-PiP switcher (title / position / arrow-disabled / slide) in
+      // sync on every state change. Cheap no-op work when not in PiP, but it
+      // also keeps document.title tracking the active note (best-effort PiP
+      // title-bar text — see syncPipSwitcher).
+      syncPipSwitcher(state, visible);
     }
 
+    // ── In-PiP note switcher ───────────────────────────────────────────────
+    // The float hides the sidebar, so the switcher is the ONLY way to change
+    // notes without bringing the app back. It lives in the header strip (empty
+    // in PiP once brand + toggle are hidden) and shows the active note's title
+    // — which doubles as the float's identity since the browser owns the PiP
+    // title bar and won't let us style it. Prev/next reuse navigateList(±1).
+    const BASE_TITLE = document.title; // "Notes · AlwaysOnTopNotes"
+    let pipLastIndex = -1; // last active position in the visible list (for slide dir)
+    function syncPipSwitcher(
+      state: ReturnType<typeof notesStore.get>,
+      visible: ReturnType<typeof searchNotes>,
+    ): void {
+      const active = state.active;
+      const title = active?.title?.trim() || (active ? "Untitled" : "");
+
+      // Best-effort PiP title-bar text: set document.title to the note title so
+      // the OS window-switcher / taskbar shows it. NOTE: Chromium often forces
+      // the ORIGIN (alwaysontopnotes.pages.dev) into the Document-PiP title bar
+      // as an anti-spoofing measure, so this may not visibly change there — but
+      // it's correct, harmless, and the switcher below surfaces the title in DOM
+      // we fully control regardless.
+      document.title = active ? `📺 ${title}` : BASE_TITLE;
+
+      if (!active) {
+        pipLastIndex = -1;
+        pipTitleBtn.textContent = "";
+        pipPosEl.textContent = "";
+        return;
+      }
+
+      const idx = visible.findIndex((e) => e.id === active.id);
+      const total = visible.length;
+      pipPosEl.textContent = total > 1 ? `${idx + 1} / ${total}` : "";
+      // Disable arrows at the edges (don't wrap — matches navigateList's clamp).
+      pipPrevBtn.disabled = idx <= 0;
+      pipNextBtn.disabled = idx < 0 || idx >= total - 1;
+
+      // Slide the title in the direction of travel when the position changed.
+      // Skip on first paint (pipLastIndex === -1) and when position is unknown.
+      pipTitleBtn.textContent = title;
+      if (pipLastIndex !== -1 && idx !== -1 && idx !== pipLastIndex) {
+        const dir = idx > pipLastIndex ? 1 : -1; // moved down/next → slide from right
+        playTitleSlide(dir);
+      }
+      pipLastIndex = idx;
+    }
+
+    // Directional slide: snap the title off-screen the way it's "coming from",
+    // then transition back to center. Honors prefers-reduced-motion (the
+    // transition-transform utility is removed there via CSS).
+    function playTitleSlide(dir: 1 | -1): void {
+      const from = dir === 1 ? 12 : -12;
+      pipTitleBtn.style.transition = "none";
+      pipTitleBtn.style.transform = `translateX(${from}px)`;
+      pipTitleBtn.style.opacity = "0";
+      // Force reflow so the no-transition start state commits before we animate.
+      void pipTitleBtn.offsetWidth;
+      pipTitleBtn.style.transition = "transform 180ms ease, opacity 180ms ease";
+      pipTitleBtn.style.transform = "translateX(0)";
+      pipTitleBtn.style.opacity = "1";
+    }
     // Best-effort theme-color control. Updates a dedicated (non-media) meta so
     // platforms that honor it (mobile address bar, installed-PWA theme) track
     // the active note color. Does NOT affect the Document-PiP title bar — that
@@ -936,6 +1053,15 @@ import { site } from "../site.config";
       // note. No-ops for returning users / unsupported browsers.
       initPipTour();
     }
+
+    // In-PiP note switcher buttons. Prev = K = up (-1), Next = J = down (+1) —
+    // same direction semantics as the keyboard nav they mirror. The title acts
+    // as a "bring the app back" affordance (the sidebar is the richer switcher).
+    pipPrevBtn.addEventListener("click", () => navigateList(-1));
+    pipNextBtn.addEventListener("click", () => navigateList(1));
+    pipTitleBtn.addEventListener("click", () => {
+      if (isPipOpen()) closePip();
+    });
 
     newBtn.addEventListener("click", () => {
       void notesStore.createNote();

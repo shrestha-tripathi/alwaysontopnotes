@@ -477,8 +477,10 @@ html[data-theme="dark"] .sticky-card:hover {
    - the brand home link (the PiP title bar already identifies the window)
    - the PiP toggle itself (close is in the title bar; toggling-to-close from
      inside the float is confusing)
-   - the "On your device" reassurance text (saves horizontal space) */
+   - the "On your device" reassurance text (frees the strip so the absolutely-
+     centered switcher reads as optically centered, not shoved left) */
 :where(.pip-mode) header > a[aria-label$="home"],
+:where(.pip-mode) #device-badge,
 :where(.pip-mode) #pip-toggle {
   display: none !important;
 }
@@ -747,5 +749,59 @@ html[data-theme="dark"] .sticky-card:hover {
   .aotn-pip-tour-popover {
     width: calc(100vw - 24px) !important;
     left: 12px !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * In-PiP note switcher (commit: pip note switcher). Lives in the header
+ * strip; hidden in the two-pane app, revealed only inside the float where
+ * the brand + pip-toggle are hidden and the strip would otherwise be empty.
+ * Lets the user flip notes without bringing the app back, and surfaces the
+ * active note's title in DOM we control (the browser owns the PiP title bar).
+ * ─────────────────────────────────────────────────────────────────────── */
+/* Absolutely-center the switcher in the PiP header so it stays a tight,
+   cohesive cluster regardless of header width (the float can be resized wide).
+   Save-status remains in normal flow at the right; the hidden brand/toggle on
+   the left no longer push the switcher off-center. */
+:where(.pip-mode) header {
+  position: relative;
+}
+:where(.pip-mode) #pip-switcher {
+  display: flex;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 5rem); /* leave room for save-status on the right */
+}
+
+/* On a tinted header (a note is active) the switcher text + arrows use the
+   note INK so they read on the pastel — never the theme fg, which would go
+   white-on-pastel in dark mode (same literal-swatch rule as everywhere). */
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-title {
+  color: var(--note-ink);
+}
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-prev,
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-next {
+  color: color-mix(in srgb, var(--note-ink) 70%, transparent);
+}
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-prev:not(:disabled):hover,
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-next:not(:disabled):hover {
+  color: var(--note-ink);
+  background-color: color-mix(in srgb, var(--note-edge) 55%, transparent);
+}
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-pos {
+  color: color-mix(in srgb, var(--note-ink) 55%, transparent);
+}
+:where(.pip-mode) #app-root[style*="--note-bg"] #pip-title:hover {
+  background-color: color-mix(in srgb, var(--note-edge) 45%, transparent);
+  border-radius: 6px;
+}
+
+/* Reduced-motion: kill the title slide (JS sets an inline transition; this
+   wins via !important so the swap is instant for users who opt out). */
+@media (prefers-reduced-motion: reduce) {
+  #pip-title {
+    transition: none !important;
   }
 }
