@@ -1142,23 +1142,15 @@ html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scr
   border-radius: 999px;
   pointer-events: none;
 }
-/* Reduced motion → flat scrollable list, no 3D depth/animation. Collapse the
-   transform to a simple vertical offset and let the deck scroll if it overflows
-   (the focused card stays outlined for orientation). */
+/* Reduced motion → keep the STATIC 3D deck (resting depth is NOT motion — it's
+   the visual the user expects, same lesson as the sticky-card tilt fix
+   `00743ed`), but drop ONLY the animated transition so cards SNAP between
+   positions instead of sliding. RM suppresses movement/animation, never the
+   resting 3D depth. (The earlier version flattened the whole deck to a plain
+   list here — that over-applied RM and surprised a user on battery-saver, which
+   silently forces prefers-reduced-motion.) */
 @media (prefers-reduced-motion: reduce) {
-  .pip-stack-deck {
-    perspective: none;
-    justify-content: flex-start;
-    padding: 16px 0;
-    overflow-y: auto;
-  }
   .pip-stack-card {
-    position: relative;
-    left: auto;
-    top: auto;
-    transform: none;
-    opacity: 1;
-    margin: 5px 0;
     transition: none;
   }
 }
