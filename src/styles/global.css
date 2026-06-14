@@ -639,6 +639,31 @@ html[data-theme="dark"] .sticky-card:hover {
   background-color: var(--note-bg);
 }
 
+/* ── PiP-only: kill the WHITE overscroll rubber-band. Two compounding layers:
+   1. `overscroll-behavior: none` on the scroller + html/body stops scroll-
+      CHAINING, so reaching the editor's scroll limit never rubber-bands the
+      document root into view. This is the canonical fix.
+   2. Belt-and-suspenders: paint the PiP <html> + <body> with the note bg too,
+      so even if some overscroll path still bounces the root, there's no white
+      to reveal — the note color is edge-to-edge behind everything.
+   ⚠️ The `.pip-mode` class is ON the <html> element itself, so a descendant
+   selector (`:where(.pip-mode) html`) does NOT match the root (html can't be a
+   descendant of itself). Target the element directly: `html:where(.pip-mode)`.
+   The PiP <html> gets `--note-bg` driven onto it by render()/paintPipRoot (the
+   JS sets it on the float's documentElement + body while floating); these rules
+   consume it. `:where()` keeps specificity 0 so Tailwind utilities still win. */
+html:where(.pip-mode),
+:where(.pip-mode) body {
+  overscroll-behavior: none;
+}
+:where(.pip-mode) .nice-scroll {
+  overscroll-behavior: contain;
+}
+html:where(.pip-mode)[style*="--note-bg"],
+:where(.pip-mode) body[style*="--note-bg"] {
+  background-color: var(--note-bg);
+}
+
 /* ─────────────────────────────────────────────────────────────────────
  * PiP onboarding pointer (commit 14) — one-step spotlight + popover that
  * fires once on first Chromium visit, pointing at #pip-toggle. Class

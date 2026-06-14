@@ -997,6 +997,8 @@ import { site } from "../site.config";
         // styling API. This only affects the mobile address bar / PWA theme on
         // platforms that honor it; the PiP title bar stays browser-default.
         setThemeColor(sw.bg);
+        // Paint the float's own document root so overscroll never flashes white.
+        paintPipRoot(sw.bg);
         if (isColorPopoverOpen()) syncColorPickerActive();
       } else {
         // Deselected — clear the editor's bound note so re-selecting reloads.
@@ -1008,6 +1010,7 @@ import { site } from "../site.config";
         appRoot.style.removeProperty("--note-ink");
         appRoot.style.removeProperty("--note-edge");
         resetThemeColor();
+        paintPipRoot(null);
       }
 
       // Keep the in-PiP switcher (title / position / arrow-disabled / slide) in
@@ -1196,6 +1199,31 @@ import { site } from "../site.config";
       }
     }
 
+    /** Paint the PiP float's <html> + <body> with the note color (or clear it).
+     *  The float is a SEPARATE document; tinting only the moved #app-root leaves
+     *  the float's own document root browser-default white, which rubber-bands
+     *  into view on overscroll (the "white flash when you scroll past the end").
+     *  Driving --note-bg onto the float's documentElement + body — consumed by
+     *  the `:where(.pip-mode) html[style*="--note-bg"]` CSS — makes the color
+     *  edge-to-edge so there's no white to reveal. No-op when not floating. */
+    function paintPipRoot(bg: string | null): void {
+      try {
+        const win = pipWindowRef();
+        if (!win || win.closed) return;
+        const docEl = win.document.documentElement;
+        const body = win.document.body;
+        if (bg) {
+          docEl.style.setProperty("--note-bg", bg);
+          if (body) body.style.setProperty("--note-bg", bg);
+        } else {
+          docEl.style.removeProperty("--note-bg");
+          if (body) body.style.removeProperty("--note-bg");
+        }
+      } catch {
+        // The float can tear down mid-render; never let it break the app.
+      }
+    }
+
     // ── toast ──────────────────────────────────────────────────────────
     function showUndoToast(title: string): void {
       toastMsg.textContent = title ? `Deleted “${trim(title)}”` : "Note deleted";
@@ -1363,6 +1391,11 @@ import { site } from "../site.config";
           // 1) Reparenting blurs the focused contentEditable — re-focus so the
           //    user can type immediately in the floating note.
           if (notesStore.get().activeId) focusEditorSoon();
+          // 1b) Paint the freshly-created float document root with the active
+          //     note color NOW (render() may not fire again until a state
+          //     change) so overscroll never flashes the browser-default white.
+          const act = notesStore.get().active;
+          paintPipRoot(act ? swatchOf(act.color).bg : null);
           // 2) Bind the keymap + outside-click onto the PiP document so all
           //    shortcuts (N/J/K/?/Esc/Cmd+S) work INSIDE the float.
           bindGlobalListeners(pipWindow.document);
