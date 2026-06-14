@@ -2,21 +2,29 @@
  * Tiptap editor factory — Phase 2 commit 8.
  *
  * VANILLA Tiptap v3 (NO React — this is an Astro MPA island). Builds the rich
- * editor used in /app: the StarterKit basics + checkboxes + links + text color
- * + smart typography, with a floating BubbleMenu toolbar on text selection.
+ * editor used in /app: the StarterKit basics + checkboxes + links + smart
+ * typography, with a floating BubbleMenu toolbar on text selection.
  *
  * Pinned to @tiptap/*@3.26.1 (exact). Do NOT use `@latest` — Tiptap ships
  * breaking changes on minors.
  *
+ * ── Editor capabilities == Markdown-representable set (deliberate) ────────
+ * The /app editor offers ONLY marks/nodes that round-trip losslessly through
+ * the Markdown converters (src/lib/markdown/*), because /app has a raw-Markdown
+ * edit mode (#md-toggle-btn). Markdown has NO syntax for inline text color or
+ * underline, so those extensions are intentionally NOT registered — offering
+ * them would silently DROP user formatting the moment Markdown mode touched it.
+ * (The sticky-note BACKGROUND color — note.color — is unrelated: it's the paper
+ * metaphor, not a text mark, and is fully preserved.) If you ever add a mark
+ * here, it MUST have a converter in markdown/{serialize,parse}.ts first.
+ *
  * ── v3 gotchas baked in here ─────────────────────────────────────────────
- *  - StarterKit v3 ALREADY bundles Link (+ Underline, CodeBlock, history as
- *    `UndoRedo`). So Link is configured THROUGH StarterKit — adding the
- *    standalone @tiptap/extension-link too would throw "duplicate extension".
+ *  - StarterKit v3 ALREADY bundles Link, Underline, CodeBlock, history (as
+ *    `UndoRedo`). Link is configured THROUGH StarterKit; Underline is DISABLED
+ *    via `underline: false` (no Markdown form — see capability note above).
  *  - BubbleMenu v3 is an EXTENSION (added to `extensions`), configured with a
  *    DOM `element` + `shouldShow`. It uses @floating-ui/dom internally (no more
  *    tippy.js). We pass our own toolbar element so styling stays in Tailwind.
- *  - Color lives in @tiptap/extension-color and REQUIRES TextStyle to be
- *    present (it's a TextStyle-backed mark). Order: TextStyle before Color.
  */
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -24,8 +32,6 @@ import { TaskList } from "@tiptap/extension-task-list";
 import { TaskItem } from "@tiptap/extension-task-item";
 import { Placeholder } from "@tiptap/extension-placeholder";
 import { Typography } from "@tiptap/extension-typography";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { Color } from "@tiptap/extension-color";
 import { BubbleMenu } from "@tiptap/extension-bubble-menu";
 import type { JSONContent } from "./types";
 
@@ -53,11 +59,13 @@ export function makeEditor(opts: MakeEditorOptions): Editor {
           linkOnPaste: true,
           HTMLAttributes: { rel: "noopener noreferrer nofollow", target: "_blank" },
         },
+        // Underline is bundled too, but Markdown has no underline syntax and
+        // /app has a raw-Markdown mode — so disable it to keep the editor's
+        // capabilities == the Markdown-representable set (lossless round-trip).
+        underline: false,
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
-      TextStyle, // must precede Color (Color is a TextStyle-backed mark)
-      Color,
       Typography, // smart quotes / dashes / arrows — one-line quality boost
       Placeholder.configure({ placeholder: "Write something…" }),
       BubbleMenu.configure({

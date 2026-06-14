@@ -450,15 +450,6 @@ import { site } from "../site.config";
       <button type="button" data-cmd="link" title="Add/edit link (Ctrl/Cmd+K)" aria-label="Add link" class="bubble-btn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
       </button>
-      {/* Text color — 5 quick swatches + clear */}
-      <span class="mx-0.5 h-5 w-px bg-[var(--color-border)]" aria-hidden="true"></span>
-      <div class="flex items-center gap-0.5" role="group" aria-label="Text color">
-        <button type="button" data-color="#ef4444" title="Red text" aria-label="Red text" class="bubble-swatch" style="background:#ef4444"></button>
-        <button type="button" data-color="#f59e0b" title="Amber text" aria-label="Amber text" class="bubble-swatch" style="background:#f59e0b"></button>
-        <button type="button" data-color="#22c55e" title="Green text" aria-label="Green text" class="bubble-swatch" style="background:#22c55e"></button>
-        <button type="button" data-color="#3b82f6" title="Blue text" aria-label="Blue text" class="bubble-swatch" style="background:#3b82f6"></button>
-        <button type="button" data-color="" title="Default color" aria-label="Clear color" class="bubble-btn text-[11px] font-semibold">A</button>
-      </div>
     </div>
 
     {/* Undo-delete toast (single, replaces — never stacks) */}
@@ -663,7 +654,6 @@ import { site } from "../site.config";
     // Both edit the SAME note and funnel through the SAME debounced store path
     // (updateActiveDoc), so title/preview/cross-tab-sync stay consistent.
     let mdMode = false;
-    let mdLossHintShown = false;
     let mdNoteId: string | null = null; // which note the textarea currently holds
 
     /** Debounced autosave for the textarea path: parse MD → doc → store.
@@ -713,11 +703,6 @@ import { site } from "../site.config";
       mdEditor.value = docToMarkdown(doc as JSONContent);
       mdNoteId = active.id;
       syncEditorMode(true);
-      // One-time, non-blocking heads-up about the lossy marks.
-      if (!mdLossHintShown) {
-        mdLossHintShown = true;
-        showInfoToast("Markdown mode: underline & text color aren't represented in Markdown.");
-      }
       mdEditor.focus();
     }
 
@@ -775,15 +760,6 @@ import { site } from "../site.config";
           else if (cmd === "code") chain.toggleCode().run();
           else if (cmd === "link") toggleLink(ed);
           syncBubbleActive(ed);
-        });
-      });
-      bubbleEl.querySelectorAll<HTMLButtonElement>("[data-color]").forEach((btn) => {
-        btn.addEventListener("mousedown", (e) => e.preventDefault());
-        btn.addEventListener("click", () => {
-          const color = btn.dataset.color ?? "";
-          const chain = ed.chain().focus();
-          if (color) chain.setColor(color).run();
-          else chain.unsetColor().run();
         });
       });
       // Reflect active marks on selection change.

@@ -2,9 +2,9 @@
  * Tiptap doc → Markdown (CommonMark + GFM task lists).
  *
  * Hand-rolled ON PURPOSE (SPEC-Phase4 Decision A): our editor schema is small
- * and FROZEN (StarterKit v3 + TaskList/TaskItem + TextStyle/Color + Typography),
- * so a ~150-line serializer gives a perfect round-trip with zero deps — the
- * vanilla-Tiptap-v3 markdown libs are React-coupled / immature.
+ * and FROZEN (StarterKit v3 + TaskList/TaskItem + Typography), so a ~150-line
+ * serializer gives a perfect round-trip with zero deps — the vanilla-Tiptap-v3
+ * markdown libs are React-coupled / immature.
  *
  * Handles exactly:
  *   blocks  paragraph · heading(1-6) · bulletList · orderedList ·
@@ -12,9 +12,12 @@
  *           horizontalRule · hardBreak
  *   marks   bold · italic · strike · code(inline) · link{href}
  *
- * LOSSY (documented + acceptable): `underline` and `textStyle`/`color` have no
- * clean Markdown form → the mark is dropped, the text is kept. Everything else
- * round-trips losslessly via markdownToDoc().
+ * LOSSLESS by design: the editor (tiptapSetup.ts) deliberately registers ONLY
+ * marks/nodes that have a Markdown form — inline text color + underline were
+ * removed precisely so doc → markdown → doc never drops user formatting. Legacy
+ * `textStyle`/`color`/`underline` marks on old notes are stripped at read time
+ * by migrateNote(), so they never reach this serializer. If you ever add a mark
+ * to the editor, add its converter HERE (and in parse.ts) in the same change.
  */
 import type { JSONContent } from "../types";
 

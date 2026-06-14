@@ -26,6 +26,45 @@ import {
 } from "./types";
 import { emptyDoc, deriveTitle } from "./docText";
 
+/**
+ * Marks the editor no longer registers. Inline text color (`textStyle`/`color`)
+ * and `underline` were removed so the editor's capabilities == the Markdown-
+ * representable set (see tiptapSetup.ts). A doc loaded with a mark whose
+ * extension is gone makes ProseMirror THROW ("There is no mark type named …")
+ * and crash the editor — so we strip these marks from every record on read.
+ * The text content is preserved; only the (un-representable) formatting drops.
+ */
+const REMOVED_MARKS = new Set(["textStyle", "color", "underline"]);
+
+/** Recursively strip REMOVED_MARKS from a Tiptap doc tree (returns a new tree
+ *  only when something actually changed, to avoid needless churn). */
+function stripRemovedMarks(node: JSONContent): JSONContent {
+  let changed = false;
+
+  let marks = node.marks;
+  if (marks && marks.some((m) => REMOVED_MARKS.has(m.type))) {
+    marks = marks.filter((m) => !REMOVED_MARKS.has(m.type));
+    changed = true;
+  }
+
+  let content = node.content;
+  if (content && content.length) {
+    const next = content.map((child) => {
+      const stripped = stripRemovedMarks(child);
+      if (stripped !== child) changed = true;
+      return stripped;
+    });
+    if (changed) content = next;
+  }
+
+  if (!changed) return node;
+  const out: JSONContent = { ...node };
+  if (marks && marks.length) out.marks = marks;
+  else delete out.marks;
+  if (content) out.content = content;
+  return out;
+}
+
 export function migrateNote(raw: unknown): Note | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -34,7 +73,9 @@ export function migrateNote(raw: unknown): Note | null {
   const updatedAt = typeof r.updatedAt === "number" ? r.updatedAt : Date.now();
   const createdAt = typeof r.createdAt === "number" ? r.createdAt : updatedAt;
   const plainText = typeof r.plainText === "string" ? r.plainText : "";
-  const doc = (r.doc && typeof r.doc === "object" ? r.doc : emptyDoc()) as JSONContent;
+  const rawDoc = (r.doc && typeof r.doc === "object" ? r.doc : emptyDoc()) as JSONContent;
+  // Strip marks the editor no longer registers, else ProseMirror throws on load.
+  const doc = stripRemovedMarks(rawDoc);
 
   const note: Note = {
     id: r.id,

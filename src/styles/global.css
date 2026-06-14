@@ -1215,6 +1215,14 @@ html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scr
 #md-editor {
   caret-color: var(--note-ink, var(--color-fg));
   tab-size: 2;
+  /* The note ink is a near-black designed for the LIGHT pastel swatch. Under the
+     app's `color-scheme: dark` (set on :root), a transparent <textarea> paints
+     the browser's DARK form widget canvas behind the text → near-black ink on a
+     near-black UA canvas = invisible (the dark-mode black-on-black bug). Pin the
+     textarea to a light color-scheme AND give it an explicit note-tinted surface
+     so it always renders as light paper with dark ink, in either theme. */
+  color-scheme: light;
+  background-color: var(--note-bg, var(--color-bg));
 }
 #md-editor::placeholder {
   color: color-mix(in srgb, var(--note-ink, var(--color-fg)) 45%, transparent);
