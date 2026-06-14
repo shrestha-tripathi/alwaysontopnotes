@@ -1,0 +1,825 @@
+---
+/**
+ * MechanismAnimation — the "how it works" animated scene.
+ *
+ * Shows the magic moment of Document Picture-in-Picture in a 6s loop:
+ *
+ *   t=0.0s  static state — cursor at rest, sticky note in browser
+ *   t=0.8s  cursor moves toward "Pop out" button
+ *   t=2.0s  click — button scales down (press feedback), then bounces
+ *   t=2.3s  note inside browser lifts (scale 1.04, shadow expands)
+ *   t=2.6s  floating mini-window materializes (scale 0.6 → 1.0 spring + fade in)
+ *   t=3.2s  hold "popped out" state — browser dims, floating note glows
+ *   t=5.4s  fade back to start
+ *   t=6.0s  loop
+ *
+ * Implementation:
+ *   - Pure CSS animation (no JS in the animation itself, all keyframes)
+ *   - IntersectionObserver gates animation to visible viewport (CPU savings)
+ *   - Pause on hover so users can study the moment (per UX-CHARTER §5)
+ *   - Respects prefers-reduced-motion (global rule in global.css disables it)
+ *   - Both themes supported via CSS vars
+ *   - Mobile: animation hidden, replaced with static 3-step diagram (≤640px)
+ */
+---
+
+<section class="mx-auto max-w-[1200px] px-6 py-16 md:px-12 md:py-24">
+  {/* Header */}
+  <div class="mx-auto max-w-2xl text-center">
+    <span
+      class="text-xs font-semibold uppercase tracking-wider text-[var(--color-accent-strong)]"
+    >
+      How it works
+    </span>
+    <h2
+      class="mt-3 text-3xl font-bold tracking-tight text-[var(--color-fg)] md:text-4xl lg:text-5xl"
+    >
+      Browser tab →
+      <span class="relative inline-block">
+        <span class="relative z-10">floating window.</span>
+        <span
+          class="absolute inset-x-0 bottom-1 h-3 -skew-y-1 bg-[var(--color-accent)] opacity-80"
+          aria-hidden="true"
+        ></span>
+      </span>
+      <br class="hidden md:block" />
+      One click. Zero install.
+    </h2>
+    <p class="mt-5 text-base leading-relaxed text-[var(--color-fg-muted)] md:text-lg">
+      Every browser since Chrome 116 has a hidden superpower called Document
+      Picture-in-Picture. We use it to give your note a real OS-level window
+      that stays on top of everything else — Zoom, fullscreen video,
+      Excel, anything.
+    </p>
+  </div>
+
+  {/* DESKTOP: animated stage */}
+  <div
+    id="mech-stage"
+    class="mech-stage relative mx-auto mt-16 hidden aspect-[16/9] w-full max-w-[960px] sm:block"
+    aria-label="Animation: clicking 'Pop out' detaches a note into a floating window that stays on top of every other app."
+  >
+    {/* The browser window (the main app) */}
+    <div class="mech-browser">
+      {/* Browser chrome — minimal Windows-style title bar */}
+      <div class="mech-browser-chrome">
+        <div class="mech-tab">
+          <span class="mech-tab-favicon"></span>
+          <span class="mech-tab-title">AlwaysOnTopNotes</span>
+        </div>
+        <div class="mech-window-controls">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="2" y="5.5" width="8" height="1"></rect></svg>
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 2l8 8M10 2L2 10"></path></svg>
+        </div>
+      </div>
+
+      {/* App body: sidebar + editor */}
+      <div class="mech-app">
+        {/* Sidebar with 3 notes */}
+        <aside class="mech-sidebar">
+          <div class="mech-sidebar-header">
+            <span class="mech-sidebar-title">Notes</span>
+            <span class="mech-sidebar-count">3</span>
+          </div>
+          <ul class="mech-note-list">
+            <li class="mech-note-item active">
+              <span class="mech-note-dot" style="background:#fde047"></span>
+              <span class="mech-note-name">Q3 Review notes</span>
+            </li>
+            <li class="mech-note-item">
+              <span class="mech-note-dot" style="background:#bae6fd"></span>
+              <span class="mech-note-name">Standup talking points</span>
+            </li>
+            <li class="mech-note-item">
+              <span class="mech-note-dot" style="background:#fbcfe8"></span>
+              <span class="mech-note-name">Weekend ideas</span>
+            </li>
+          </ul>
+        </aside>
+
+        {/* Main editor area */}
+        <main class="mech-editor">
+          <header class="mech-editor-toolbar">
+            <h3 class="mech-editor-title">Q3 Review notes</h3>
+            <button class="mech-pop-out-btn" type="button" tabindex="-1">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M15 3h6v6"></path>
+                <path d="M10 14L21 3"></path>
+                <path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"></path>
+              </svg>
+              <span>Pop out</span>
+            </button>
+          </header>
+
+          <div class="mech-editor-content">
+            <article class="mech-note-card">
+              <span class="mech-note-eyebrow">Q3 Review · notes</span>
+              <h4 class="mech-note-headline">Don't forget to ask</h4>
+              <ul class="mech-checklist">
+                <li><span class="mech-check"></span><span>Q4 budget approval</span></li>
+                <li><span class="mech-check"></span><span>Push back on Dec launch</span></li>
+                <li class="done"><span class="mech-check checked"></span><span>Headcount sign-off</span></li>
+              </ul>
+            </article>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    {/* Ghost placeholder — OUTSIDE the dimmed browser so it stays crisp.
+        Absolutely positioned to overlay the browser's editor area. */}
+    <div class="mech-note-ghost" aria-hidden="true">
+      <div class="mech-note-ghost-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 3h6v6"></path>
+          <path d="M10 14L21 3"></path>
+        </svg>
+        Note popped out
+      </div>
+    </div>
+
+    {/* The floating PiP window — appears mid-animation, hovers on top of browser */}
+    <div class="mech-floating" aria-hidden="true">
+      <div class="mech-floating-chrome">
+        <span class="mech-floating-title">Q3 Review notes · always on top</span>
+        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"></path></svg>
+      </div>
+      <div class="mech-floating-content">
+        <span class="mech-note-eyebrow">Q3 Review · notes</span>
+        <h4 class="mech-note-headline">Don't forget to ask</h4>
+        <ul class="mech-checklist compact">
+          <li><span class="mech-check"></span><span>Q4 budget approval</span></li>
+          <li><span class="mech-check"></span><span>Push back on Dec launch</span></li>
+        </ul>
+      </div>
+    </div>
+
+    {/* Cursor — animates along a path to "Pop out" then clicks */}
+    <svg
+      class="mech-cursor"
+      width="22"
+      height="26"
+      viewBox="0 0 16 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M1 1L1 16L4.5 12.5L7 18L9.5 17L7 11.5L11 11.5L1 1Z"
+        fill="#fafafa"
+        stroke="#0a0a0a"
+        stroke-width="1.2"
+        stroke-linejoin="round"
+      ></path>
+    </svg>
+  </div>
+
+  {/* MOBILE: static 3-step diagram (animation feels broken on small screens) */}
+  <div class="mt-12 grid gap-4 sm:hidden">
+    {[
+      { n: 1, title: "Open a note", desc: "Pick any sticky note in your browser." },
+      { n: 2, title: "Click Pop out", desc: "Or hit Cmd+Shift+P. One key, one click." },
+      { n: 3, title: "It floats forever", desc: "Real OS-level always-on-top window. Survives every fullscreen." },
+    ].map((s) => (
+      <div class="flex items-start gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-5">
+        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] text-sm font-bold text-yellow-950">
+          {s.n}
+        </div>
+        <div>
+          <h3 class="text-base font-semibold text-[var(--color-fg)]">{s.title}</h3>
+          <p class="mt-1 text-sm text-[var(--color-fg-muted)]">{s.desc}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  {/* Step indicators below the animation (desktop only) */}
+  <ol
+    class="mech-steps mx-auto mt-10 hidden max-w-3xl items-start gap-6 sm:flex sm:gap-10"
+    aria-hidden="true"
+  >
+    <li class="mech-step" data-step="1">
+      <div class="mech-step-badge">1</div>
+      <div>
+        <h3 class="mech-step-title">Open a note</h3>
+        <p class="mech-step-desc">Pick any sticky note in your browser tab.</p>
+      </div>
+    </li>
+    <li class="mech-step" data-step="2">
+      <div class="mech-step-badge">2</div>
+      <div>
+        <h3 class="mech-step-title">Click "Pop out"</h3>
+        <p class="mech-step-desc">Or hit <kbd class="mech-kbd">Cmd+Shift+P</kbd>.</p>
+      </div>
+    </li>
+    <li class="mech-step" data-step="3">
+      <div class="mech-step-badge">3</div>
+      <div>
+        <h3 class="mech-step-title">It floats forever</h3>
+        <p class="mech-step-desc">Stays on top of every other window — Zoom, fullscreen, anything.</p>
+      </div>
+    </li>
+  </ol>
+
+  <style is:global>
+    /* ============================================================
+       MECHANISM ANIMATION
+       6-second loop. All animations share `--mech-dur: 6s`.
+       Paused by default; .mech-stage.in-view starts them.
+       Pauses on hover so users can study the moment.
+       ============================================================ */
+    .mech-stage {
+      --mech-dur: 6s;
+      position: relative;
+      isolation: isolate;
+      border-radius: 16px;
+      background:
+        radial-gradient(ellipse at 70% 30%, var(--color-accent) 0%, transparent 50%),
+        var(--color-bg);
+      background-blend-mode: overlay;
+      padding: 32px;
+      overflow: hidden;
+    }
+    /* Subtle radial bg-glow */
+    .mech-stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at 75% 25%,
+        rgba(253, 224, 71, 0.08) 0%,
+        transparent 50%
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Stage paused until in-view */
+    .mech-stage:not(.in-view) .mech-browser,
+    .mech-stage:not(.in-view) .mech-floating,
+    .mech-stage:not(.in-view) .mech-cursor,
+    .mech-stage:not(.in-view) .mech-pop-out-btn,
+    .mech-stage:not(.in-view) .mech-note-card,
+    .mech-stage:not(.in-view) .mech-step {
+      animation-play-state: paused !important;
+    }
+    /* Pause on hover (per UX-CHARTER §5 — let users observe details) */
+    .mech-stage:hover .mech-browser,
+    .mech-stage:hover .mech-floating,
+    .mech-stage:hover .mech-cursor,
+    .mech-stage:hover .mech-pop-out-btn,
+    .mech-stage:hover .mech-note-card,
+    .mech-stage:hover .mech-step {
+      animation-play-state: paused !important;
+    }
+
+    /* ------------ Browser window ------------ */
+    .mech-browser {
+      position: absolute;
+      top: 32px;
+      left: 32px;
+      width: calc(100% - 64px);
+      max-width: 640px;
+      aspect-ratio: 16/10;
+      background: var(--color-bg);
+      border: 1px solid var(--color-border-strong);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 24px 48px -12px rgba(0,0,0,0.25);
+      z-index: 1;
+      transform-origin: center;
+      animation: mech-browser-dim var(--mech-dur) ease-in-out infinite;
+    }
+    @keyframes mech-browser-dim {
+      0%, 35%, 92%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: none;
+      }
+      55%, 85% {
+        opacity: 0.35;
+        transform: scale(0.94);
+        filter: blur(2px) saturate(0.5) brightness(0.7);
+      }
+    }
+
+    .mech-browser-chrome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--color-bg-muted);
+      border-bottom: 1px solid var(--color-border);
+      height: 28px;
+    }
+    .mech-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--color-bg);
+      padding: 3px 10px;
+      border-radius: 4px 4px 0 0;
+      font-size: 11px;
+      color: var(--color-fg-muted);
+    }
+    .mech-tab-favicon {
+      width: 8px;
+      height: 8px;
+      border-radius: 1px;
+      background: var(--color-accent);
+    }
+    .mech-window-controls {
+      display: flex;
+      gap: 12px;
+      color: var(--color-fg-subtle);
+    }
+
+    .mech-app {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      height: calc(100% - 28px);
+    }
+
+    .mech-sidebar {
+      background: var(--color-bg-subtle);
+      border-right: 1px solid var(--color-border);
+      padding: 10px 8px;
+      overflow: hidden;
+    }
+    .mech-sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px 8px;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 6px;
+    }
+    .mech-sidebar-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--color-fg-subtle);
+    }
+    .mech-sidebar-count {
+      font-size: 9px;
+      color: var(--color-fg-subtle);
+      background: var(--color-bg-muted);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    .mech-note-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .mech-note-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      color: var(--color-fg-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mech-note-item.active {
+      background: var(--color-bg-muted);
+      color: var(--color-fg);
+      font-weight: 500;
+    }
+    .mech-note-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .mech-note-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mech-editor {
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow: hidden;
+    }
+    .mech-editor-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .mech-editor-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--color-fg);
+      margin: 0;
+    }
+    .mech-pop-out-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--color-fg);
+      color: var(--color-bg);
+      border: none;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      animation: mech-btn-press var(--mech-dur) ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes mech-btn-press {
+      0%, 32%, 38%, 100% { transform: scale(1); background: var(--color-fg); }
+      33%, 36% {
+        transform: scale(0.92);
+        background: var(--color-accent);
+        color: #422006;
+      }
+      40% {
+        transform: scale(1.05);
+        background: var(--color-accent);
+        color: #422006;
+      }
+      44% { transform: scale(1); background: var(--color-fg); color: var(--color-bg); }
+    }
+
+    .mech-editor-content {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      background: var(--color-bg-subtle);
+      position: relative;
+    }
+
+    /* Ghost placeholder — positioned OUTSIDE the .mech-browser tree so it
+       isn't subjected to the browser's blur/opacity dim filter. We absolutely
+       position it on top of where the browser editor lives within the stage. */
+    .mech-note-ghost {
+      position: absolute;
+      top: 96px;
+      left: 178px;
+      width: 360px;
+      height: 264px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed var(--color-accent);
+      border-radius: 6px;
+      background: rgba(253, 224, 71, 0.04);
+      opacity: 0;
+      z-index: 5;
+      pointer-events: none;
+      animation: mech-ghost-show var(--mech-dur) ease-in-out infinite;
+    }
+    @keyframes mech-ghost-show {
+      0%, 48%, 88%, 100% { opacity: 0; }
+      55%, 82% { opacity: 1; }
+    }
+    .mech-note-ghost-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--color-bg);
+      border: 1px solid var(--color-accent);
+      border-radius: 6px;
+      color: var(--color-accent);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .mech-note-card {
+      width: 100%;
+      max-width: 280px;
+      background: #fde047;
+      color: #422006;
+      border-radius: 6px;
+      padding: 14px;
+      transform-origin: center;
+      box-shadow:
+        0 1px 2px rgba(0,0,0,0.05),
+        0 4px 12px rgba(0,0,0,0.1);
+      animation: mech-card-lift var(--mech-dur) ease-in-out infinite;
+    }
+    /* Card "leaves" the browser between 42-58% and stays gone until 88% —
+       this prevents the visual "two yellow notes side-by-side" confusion
+       and makes the floating note the only yellow object during the
+       popped-out phase. */
+    @keyframes mech-card-lift {
+      0%, 32%, 92%, 100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.1);
+      }
+      40% {
+        transform: scale(1.04) translateY(-2px);
+        opacity: 1;
+        box-shadow:
+          0 0 30px rgba(253,224,71,0.5),
+          0 4px 8px rgba(0,0,0,0.08),
+          0 12px 28px rgba(0,0,0,0.15);
+      }
+      48% {
+        transform: scale(0.6) translateY(-30px) translateX(40px);
+        opacity: 0;
+      }
+      52%, 86% {
+        transform: scale(0.6) translateY(-30px) translateX(40px);
+        opacity: 0;
+      }
+      90% {
+        transform: scale(0.95) translateY(0);
+        opacity: 0.6;
+      }
+    }
+
+    .mech-note-eyebrow {
+      display: block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      opacity: 0.6;
+    }
+    .mech-note-headline {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 4px 0 8px;
+      color: #422006;
+    }
+    .mech-checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 11px;
+    }
+    .mech-checklist li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mech-checklist li.done {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+    .mech-check {
+      width: 11px;
+      height: 11px;
+      border: 1px solid rgba(66, 32, 6, 0.5);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .mech-check.checked {
+      background: rgba(66, 32, 6, 0.2);
+      border-color: rgba(66, 32, 6, 0.7);
+    }
+
+    /* ------------ Floating PiP window ------------
+       Positioned to OVERLAP the right side of the browser, making the
+       "popped out and floating above" relationship visually unambiguous.
+       Stage is ~960px wide, browser ends around x=672. Floating note
+       (240px wide) is positioned so its LEFT edge is at ~510 — placing
+       half of it OVER the browser, half overhanging to the right. This
+       reads as "floating above the dimmed browser" rather than "next to". */
+    .mech-floating {
+      position: absolute;
+      top: 110px;
+      left: calc(min(640px, 100% - 64px) - 80px);
+      width: 240px;
+      background: #fde047;
+      color: #422006;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow:
+        0 0 140px -4px rgba(253,224,71,0.7),
+        0 0 80px -10px rgba(253,224,71,0.55),
+        0 0 30px -4px rgba(253,224,71,0.4),
+        0 4px 12px rgba(0,0,0,0.15),
+        0 16px 40px -8px rgba(0,0,0,0.4),
+        0 32px 64px -16px rgba(0,0,0,0.5);
+      transform-origin: top right;
+      opacity: 0;
+      transform: scale(0.4) translate(60px, -30px);
+      z-index: 10;
+      animation: mech-float-in var(--mech-dur) cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+    }
+    @keyframes mech-float-in {
+      0%, 42% {
+        opacity: 0;
+        transform: scale(0.4) translate(60px, -30px) rotate(-8deg);
+      }
+      48% {
+        opacity: 0.85;
+        transform: scale(0.85) translate(20px, -10px) rotate(-3deg);
+      }
+      52% {
+        opacity: 1;
+        transform: scale(1.06) translate(0, 0) rotate(0deg);
+      }
+      56%, 88% {
+        opacity: 1;
+        transform: scale(1) translate(0, 0) rotate(0deg);
+      }
+      96%, 100% {
+        opacity: 0;
+        transform: scale(0.4) translate(60px, -30px) rotate(-8deg);
+      }
+    }
+
+    .mech-floating-chrome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: rgba(66, 32, 6, 0.08);
+      border-bottom: 1px solid rgba(66, 32, 6, 0.1);
+      font-size: 9px;
+      font-weight: 600;
+      color: rgba(66, 32, 6, 0.7);
+    }
+    .mech-floating-title {
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mech-floating-content {
+      padding: 10px 12px 12px;
+    }
+    .mech-checklist.compact {
+      gap: 4px;
+      font-size: 10px;
+    }
+
+    /* ------------ Cursor ------------ */
+    .mech-cursor {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 20;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+      transform-origin: top left;
+      animation: mech-cursor-path var(--mech-dur) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    /* Cursor path: rest → approach Pop Out btn → press → rest */
+    @keyframes mech-cursor-path {
+      0%, 5% {
+        transform: translate(20%, 75%) scale(1);
+        opacity: 1;
+      }
+      30%, 32% {
+        transform: translate(46%, 14%) scale(1);
+      }
+      34%, 36% {
+        transform: translate(46%, 14%) scale(0.85);
+      }
+      40% {
+        transform: translate(46%, 14%) scale(1);
+      }
+      55% {
+        transform: translate(75%, 35%) scale(1);
+      }
+      85% {
+        transform: translate(75%, 35%) scale(1);
+        opacity: 1;
+      }
+      95%, 100% {
+        transform: translate(20%, 75%) scale(1);
+        opacity: 1;
+      }
+    }
+
+    /* ------------ Step indicators ------------ */
+    .mech-steps {
+      list-style: none;
+      padding: 0;
+      counter-reset: step;
+    }
+    .mech-step {
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      opacity: 0.6;
+      transition: opacity 200ms ease;
+      animation: mech-step-glow var(--mech-dur) ease-in-out infinite;
+    }
+    .mech-step[data-step="1"] { animation-delay: 0s; }
+    .mech-step[data-step="2"] { animation-delay: 2.0s; }
+    .mech-step[data-step="3"] { animation-delay: 3.4s; }
+
+    .mech-stage:not(.in-view) ~ .mech-steps .mech-step,
+    .mech-stage:hover ~ .mech-steps .mech-step {
+      animation-play-state: paused !important;
+    }
+
+    @keyframes mech-step-glow {
+      0%, 25%, 100% { opacity: 0.55; }
+      5%, 18% { opacity: 1; }
+    }
+
+    .mech-step-badge {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      color: #422006;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .mech-step-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-fg);
+      margin: 4px 0 4px;
+    }
+    .mech-step-desc {
+      font-size: 13px;
+      color: var(--color-fg-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+    .mech-kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: var(--color-bg-muted);
+      border: 1px solid var(--color-border);
+      border-radius: 3px;
+      color: var(--color-fg);
+    }
+
+    /* Reduced motion fallback */
+    @media (prefers-reduced-motion: reduce) {
+      .mech-browser,
+      .mech-floating,
+      .mech-cursor,
+      .mech-pop-out-btn,
+      .mech-note-card,
+      .mech-note-ghost,
+      .mech-step {
+        animation: none !important;
+      }
+      .mech-floating {
+        opacity: 1;
+        transform: scale(1) translate(0, 0);
+      }
+      .mech-note-ghost {
+        opacity: 0.7;
+      }
+      .mech-note-card {
+        opacity: 0;
+      }
+      .mech-cursor {
+        display: none;
+      }
+      .mech-step {
+        opacity: 1;
+      }
+    }
+  </style>
+
+  <script>
+    /**
+     * IntersectionObserver — adds `.in-view` to start animation only when
+     * stage enters viewport, removes it when stage leaves.
+     * Why: animation-play-state: paused saves CPU when off-screen.
+     */
+    const stage = document.getElementById("mech-stage");
+    if (stage && "IntersectionObserver" in window) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            entry.target.classList.toggle("in-view", entry.isIntersecting);
+          }
+        },
+        { threshold: 0.25 },
+      );
+      io.observe(stage);
+    } else {
+      // No IO support → always-on animation
+      stage?.classList.add("in-view");
+    }
+  </script>
+</section>
