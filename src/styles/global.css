@@ -1135,9 +1135,21 @@ html:not(.pip-mode) #app-root[style*="--note-bg"] main .nice-scroll::-webkit-scr
   transform-style: preserve-3d;
   opacity: calc(1 - var(--abs) * 0.22);
   z-index: calc(50 - var(--abs));
+  /* Hint the compositor so the continuous glide stays on the GPU and never
+     jank-stutters as focus moves through the deck. */
+  will-change: transform, opacity;
   transition:
-    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 220ms ease;
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms ease;
+}
+/* The 4th ring (--abs 4) is the INVISIBLE BUFFER: cards enter from / leave to it
+   so their un-transitionable first paint and their removal both happen fully
+   faded out. Force opacity 0 + no hit-testing there (the opacity formula alone
+   would leave it at ~0.12). Only ±HALF (3) rings are ever visible. */
+.pip-stack-card[data-offset="4"],
+.pip-stack-card[data-offset="-4"] {
+  opacity: 0;
+  pointer-events: none;
 }
 .pip-stack-card[data-offset="0"] {
   box-shadow:

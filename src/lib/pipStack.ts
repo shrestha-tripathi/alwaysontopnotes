@@ -51,8 +51,14 @@ export interface PipStackOptions {
   onSelect: (id: string) => void;
 }
 
-// How many cards above + below focus to render (total = 2*HALF + 1).
+// How many cards above + below focus are VISIBLE (total visible = 2*HALF + 1).
 const HALF = 3;
+// We actually render ONE extra ring beyond HALF as an invisible buffer, so cards
+// ENTER and LEAVE at opacity 0 (offset = ±RENDER_HALF, which the stylesheet fades
+// to 0). A freshly-created node can't transition its first paint — doing it at the
+// invisible buffer makes that pop imperceptible, while every VISIBLE move is a
+// smooth transition of EXISTING nodes (the buttery glide).
+const RENDER_HALF = HALF + 1;
 
 export interface PipStackController {
   /** Is the stack currently open? */
@@ -105,68 +111,123 @@ export function initPipStack(opts: PipStackOptions): PipStackController {
     paint();
   }
 
+  // Build one card node (called once per note when it first enters the window).
+  function buildCard(entry: NoteIndexEntry): HTMLButtonElement {
+    const sw = swatchOf(entry.color);
+    // OUTER card owns the 3D transform → must NOT clip (overflow visible).
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "pip-stack-card";
+    card.dataset.id = entry.id;
+    card.id = `pip-stack-${entry.id}`;
+    card.setAttribute("role", "option");
+    card.style.setProperty("--sw-bg", sw.bg);
+    card.style.setProperty("--sw-edge", sw.edge);
+    card.style.setProperty("--sw-ink", sw.ink);
+    // A stable micro-tilt so the deck doesn't look mechanically uniform.
+    card.style.setProperty("--rot", `${rotationFor(entry.id)}deg`);
+
+    // INNER spans carry the truncation (overflow:hidden) — kept OFF the card so
+    // they never create a flattening context on the 3D-transformed parent.
+    const title = document.createElement("span");
+    title.className = "pip-stack-card-title";
+    title.textContent = entry.title?.trim() || "Untitled";
+    const preview = document.createElement("span");
+    preview.className = "pip-stack-card-preview";
+    preview.textContent = entry.preview?.trim() || "Empty note";
+    card.append(title, preview);
+
+    card.addEventListener("click", () => {
+      // Clicking a focused card selects; a non-focused card focuses it (smoothly).
+      const idx = list.findIndex((e) => e.id === card.dataset.id);
+      if (idx < 0) return;
+      if (idx === focusIdx) selectFocused();
+      else {
+        focusIdx = idx;
+        paint();
+      }
+    });
+    return card;
+  }
+
+  // Position an EXISTING card at its offset from focus. Setting only the custom
+  // props (not recreating the node) lets the CSS `transition` interpolate the
+  // transform → the buttery continuous glide. offset 0 = focused/front/upright.
+  function positionCard(card: HTMLElement, offset: number): void {
+    card.style.setProperty("--offset", String(offset));
+    card.style.setProperty("--abs", String(Math.abs(offset)));
+    card.dataset.offset = String(offset);
+    card.setAttribute("aria-selected", offset === 0 ? "true" : "false");
+    card.tabIndex = offset === 0 ? 0 : -1;
+  }
+
+  // RECONCILE the deck to the current focus WITHOUT tearing it down. Cards that
+  // survive a move keep their DOM node and just get a new --offset → CSS glides
+  // them. New entrants mount at the invisible buffer ring (opacity 0) so their
+  // un-transitionable first paint is imperceptible; leavers are removed only once
+  // they've animated out past the buffer. THIS is what makes switching continuous
+  // instead of teleporting (the old render() did deck.textContent="" every move,
+  // so every card was born at its final transform — no transition could fire).
   function render(): void {
-    // Windowed slice around focus. We render a fixed band and position each card
-    // by its OFFSET from focus, so the deck scrolls as focus moves.
-    deck.textContent = "";
     if (list.length === 0) {
+      deck.textContent = "";
       const empty = document.createElement("div");
       empty.className = "pip-stack-empty";
       empty.textContent = "No notes";
       deck.appendChild(empty);
       return;
     }
-    const lo = Math.max(0, focusIdx - HALF);
-    const hi = Math.min(list.length - 1, focusIdx + HALF);
+    // Drop a stale "No notes" placeholder if we now have notes.
+    const stale = deck.querySelector(".pip-stack-empty");
+    if (stale) stale.remove();
+
+    const lo = Math.max(0, focusIdx - RENDER_HALF);
+    const hi = Math.min(list.length - 1, focusIdx + RENDER_HALF);
+
+    // Index existing card nodes by note id for reuse.
+    const existing = new Map<string, HTMLElement>();
+    deck.querySelectorAll<HTMLElement>(".pip-stack-card").forEach((el) => {
+      if (el.dataset.id) existing.set(el.dataset.id, el);
+    });
+    // On a FRESH paint (deck empty — i.e. the open() that just cleared it) place
+    // cards directly at rest so the deck appears settled & instant. Only once
+    // there ARE cards (a move within an open session) do entrants fly in from the
+    // buffer edge — that's the continuous glide, not a deal-in on every open.
+    const animateEntrants = existing.size > 0;
+
+    const keep = new Set<string>();
     for (let i = lo; i <= hi; i++) {
       const entry = list[i];
-      const offset = i - focusIdx; // negative = above, 0 = focused, positive = below
-      const sw = swatchOf(entry.color);
-
-      // OUTER card owns the 3D transform → must NOT clip (overflow visible).
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "pip-stack-card";
-      card.dataset.id = entry.id;
-      card.dataset.offset = String(offset);
-      card.setAttribute("role", "option");
-      card.setAttribute("aria-selected", offset === 0 ? "true" : "false");
-      card.style.setProperty("--sw-bg", sw.bg);
-      card.style.setProperty("--sw-edge", sw.edge);
-      card.style.setProperty("--sw-ink", sw.ink);
-      // Depth: each step recedes (translateY + translateZ + rotateX) and fades.
-      // The transform is applied via CSS custom props the stylesheet composes,
-      // so the 3D math + reduced-motion override live in one place.
-      card.style.setProperty("--offset", String(offset));
-      card.style.setProperty("--abs", String(Math.abs(offset)));
-      // A stable micro-tilt so the deck doesn't look mechanically uniform.
-      card.style.setProperty("--rot", `${rotationFor(entry.id)}deg`);
-
-      // INNER spans carry the truncation (overflow:hidden) — kept OFF the card
-      // so they never create a flattening context on the 3D-transformed parent.
-      const title = document.createElement("span");
-      title.className = "pip-stack-card-title";
-      title.textContent = entry.title?.trim() || "Untitled";
-      const preview = document.createElement("span");
-      preview.className = "pip-stack-card-preview";
-      preview.textContent = entry.preview?.trim() || "Empty note";
-
-      card.append(title, preview);
-      card.addEventListener("click", () => {
-        // Clicking a non-focused card focuses it first; a focused card selects.
-        if (offset === 0) selectFocused();
-        else {
-          focusIdx = i;
-          paint();
+      const offset = i - focusIdx;
+      keep.add(entry.id);
+      let card = existing.get(entry.id);
+      if (!card) {
+        card = buildCard(entry);
+        deck.appendChild(card);
+        if (animateEntrants) {
+          // Mount pre-positioned at the buffer edge (invisible), commit that
+          // start transform, THEN set the real offset so the transition has a
+          // start state to glide from. Without the forced reflow both land in
+          // one frame and it teleports.
+          positionCard(card, offset < 0 ? -RENDER_HALF : RENDER_HALF);
+          void card.offsetWidth;
         }
-      });
-      deck.appendChild(card);
+      }
+      positionCard(card, offset);
+      // z-order: focused on top, neighbours recede.
+      card.style.zIndex = String(50 - Math.abs(offset));
     }
+
+    // Remove cards that scrolled out of the render window. They were already at
+    // the buffer ring (opacity 0) before leaving, so removal is invisible.
+    existing.forEach((el, id) => {
+      if (!keep.has(id)) el.remove();
+    });
   }
 
-  // Repaint just the dynamic transform/selected state without rebuilding nodes
-  // when possible — but since the window slides, a full rebuild is simplest and
-  // cheap (≤7 nodes). Kept as one function for clarity.
+  // Reconcile the deck + keep the aria pointer on the focused card. Cheap to call
+  // on every move (render() reuses nodes, so this is a few style writes, not a
+  // teardown).
   function paint(): void {
     render();
     const focused = list[focusIdx];
@@ -246,6 +307,10 @@ export function initPipStack(opts: PipStackOptions): PipStackController {
     open = true;
     host.classList.add("is-open");
     toggleBtn.setAttribute("aria-expanded", "true");
+    // Start each session from a clean deck so the first paint settles instantly
+    // (render() deals cards at rest when the deck is empty) rather than gliding
+    // stale nodes left over from a previous open.
+    deck.textContent = "";
     paint();
     // Listen on the host's OWN document so it works inside the PiP window too.
     const doc = host.ownerDocument;
