@@ -536,7 +536,7 @@ import { site } from "../site.config";
   <script>
     import { notesStore } from "../lib/notesStore";
     import { searchNotes } from "../lib/searchNotes";
-    import { swatchOf, rotationFor, SWATCHES, COLOR_ORDER } from "../lib/colors";
+    import { swatchOf, rotationFor, glowVars, SWATCHES, COLOR_ORDER } from "../lib/colors";
     import { pickStorage } from "../lib/storage";
     import { isPipSupported, isPipOpen, openPip, closePip, pipWindowRef } from "../lib/pipWindow";
     import { initPipTour } from "../lib/pipTour";
@@ -839,12 +839,24 @@ import { site } from "../site.config";
       const selected = entry.id === activeId;
       li.className =
         "sticky-card group relative cursor-pointer rounded-lg border p-3 " +
-        (selected ? "ring-2 ring-[var(--color-accent)]" : "");
+        (selected ? "is-selected" : "");
       li.style.backgroundColor = sw.bg;
       li.style.borderColor = sw.edge;
       li.style.color = sw.ink;
       // Tilt lives in a custom prop so CSS can compose it with a hover lift.
       li.style.setProperty("--rot", `${rotationFor(entry.id)}deg`);
+      // Glow (selected state) = the note's OWN colour. Derived from the saturated
+      // edge swatch (the pale bg would be invisible as a glow on cream/gray/
+      // pastels); alpha baked into rgba() in JS to dodge the minifier's color-mix
+      // bug. Only the active card actually paints it (the .is-selected rule), but
+      // setting the props only-when-selected keeps the others clean.
+      if (selected) {
+        const gl = glowVars(sw.edge);
+        li.style.setProperty("--glow", gl.glow);
+        li.style.setProperty("--glow-soft", gl.soft);
+        li.style.setProperty("--glow-haze", gl.haze);
+        li.style.setProperty("--glow-strong", gl.strong);
+      }
 
       const titleRow = document.createElement("div");
       titleRow.className = "flex items-start gap-1.5";

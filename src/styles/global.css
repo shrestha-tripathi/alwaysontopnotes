@@ -304,6 +304,63 @@ html[data-theme="dark"] .sticky-card:hover {
     0 8px 20px rgba(0, 0, 0, 0.5),
     0 24px 48px -10px rgba(0, 0, 0, 0.65);
 }
+/* ── Selected card: a soft GLOW in the note's OWN colour ──────────────────────
+   The active sidebar note lights up in its own hue instead of the generic
+   accent ring. The glow colours are passed in from JS as ready-made rgba()
+   strings (`--glow` solid for a HAIRLINE edge, `--glow-soft`/`--glow-haze`/
+   `--glow-strong` with baked-in alpha for the diffuse halo). We do NOT use
+   color-mix() here: the CSS minifier (lightningcss) mis-collapses
+   `color-mix(... var(--glow) ...)` to a bare `var(--glow)`, dropping the
+   transparency → a harsh solid block. Baking the alpha in JS sidesteps that.
+
+   Design: the HERO is the blurred, SPREAD halo (two stacked blurs so it bleeds
+   well past the card edge on all sides), NOT a ring. The colour edge is only a
+   1px hairline for crispness — a thick 2px solid ring read as a hard box that
+   "contained" the glow (QA feedback). All four state combos (light/dark ×
+   rest/hover) are spelled out so the `:hover` rules can't out-specify + strip
+   the glow. The box-shadow transition is inherited from `.sticky-card`. */
+.sticky-card.is-selected {
+  /* Lift above neighbours so the halo paints OVER the adjacent cards instead of
+     hiding behind them — sidebar cards pack tight (≈0px gap after tilt), so a
+     glow drawn behind them is invisible. position+z-index gives it a stacking
+     context above the deck; the relative offset is 0 (no layout shift). */
+  position: relative;
+  z-index: 5;
+  box-shadow:
+    0 0 0 1.5px var(--glow),
+    0 0 10px 1px var(--glow-soft),
+    0 0 20px 4px var(--glow-soft),
+    0 0 34px 8px var(--glow-haze),
+    0 8px 22px -6px var(--glow-haze),
+    0 16px 32px -8px rgba(0, 0, 0, 0.12);
+}
+.sticky-card.is-selected:hover {
+  box-shadow:
+    0 0 0 1.5px var(--glow),
+    0 0 12px 1px var(--glow-soft),
+    0 0 24px 5px var(--glow-soft),
+    0 0 38px 10px var(--glow-haze),
+    0 10px 26px -6px var(--glow-haze),
+    0 24px 48px -10px rgba(0, 0, 0, 0.16);
+}
+html[data-theme="dark"] .sticky-card.is-selected {
+  box-shadow:
+    0 0 0 1.5px var(--glow),
+    0 0 12px 2px var(--glow-strong),
+    0 0 24px 5px var(--glow-soft),
+    0 0 40px 9px var(--glow-soft),
+    0 8px 24px -6px var(--glow-haze),
+    0 16px 32px -8px rgba(0, 0, 0, 0.55);
+}
+html[data-theme="dark"] .sticky-card.is-selected:hover {
+  box-shadow:
+    0 0 0 1.5px var(--glow),
+    0 0 14px 2px var(--glow-strong),
+    0 0 28px 6px var(--glow-soft),
+    0 0 46px 11px var(--glow-soft),
+    0 10px 28px -6px var(--glow-haze),
+    0 24px 48px -10px rgba(0, 0, 0, 0.65);
+}
 @media (prefers-reduced-motion: reduce) {
   /* A static resting tilt is NOT motion — keep it (battery-saver / "reduce
      animations" must not flatten the sticky-note look). Suppress only the

@@ -52,6 +52,41 @@ export function swatchOf(color: StickyColor): Swatch {
 }
 
 /**
+ * Glow colours for the selected-card box-shadow, derived from a swatch's
+ * saturated `edge` hex. Returned as ready-made `rgba()` strings with the alpha
+ * baked in — we deliberately AVOID CSS `color-mix(... var(--glow) ...)` because
+ * the production CSS minifier (lightningcss) mis-collapses it to a bare
+ * `var(--glow)`, dropping the transparency and turning the soft halo into a
+ * harsh solid block. Baking alpha here sidesteps that entirely.
+ *
+ *   --glow        solid edge hex   → the 2px colour ring
+ *   --glow-soft   ~0.55 alpha      → the main halo (light theme)
+ *   --glow-haze   ~0.40 alpha      → the tinted drop/lift
+ *   --glow-strong ~0.80 alpha      → a punchier halo for dark theme (glows read
+ *                                    fainter on the near-black board)
+ */
+export function glowVars(edgeHex: string): {
+  glow: string;
+  soft: string;
+  haze: string;
+  strong: string;
+} {
+  const m = /^#?([0-9a-f]{6})$/i.exec(edgeHex.trim());
+  // Fallback to the yellow edge if somehow malformed (keeps the glow on-brand).
+  const hex = m ? m[1] : "eab308";
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const rgba = (a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
+  return {
+    glow: `#${hex}`,
+    soft: rgba(0.85),
+    haze: rgba(0.6),
+    strong: rgba(0.95),
+  };
+}
+
+/**
  * Deterministic micro-rotation (-2°…+2°) hashed from a note id, so each sidebar
  * card tilts like a real pinned sticky note but stays stable across renders
  * (DESIGN.md §13 / UX-CHARTER §3). Pure function of the id → no layout jitter.
