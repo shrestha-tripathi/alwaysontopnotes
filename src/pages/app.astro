@@ -616,6 +616,25 @@ import { site } from "../site.config";
         },
       });
       wireBubbleToolbar(editor);
+      // Make links followable. Tiptap's link has openOnClick:false (so clicking
+      // inside the editor places the caret instead of navigating while you edit)
+      // — but users expect to actually FOLLOW a link. Compromise: a plain click
+      // with NO text selection opens it in a new tab; if the user is selecting
+      // text (or Shift/drag), we leave the caret alone. Cmd/Ctrl+click also opens
+      // (the familiar "open in new tab" gesture). Delegated off the host so it
+      // survives the editor's internal re-renders.
+      editorHost.addEventListener("click", (e) => {
+        const a = (e.target as HTMLElement).closest("a");
+        if (!a || !editorHost.contains(a)) return;
+        const href = a.getAttribute("href");
+        if (!href) return;
+        // Don't hijack a click that's the tail end of a text selection drag.
+        const sel = editorHost.ownerDocument.getSelection();
+        const selecting = sel && !sel.isCollapsed && sel.toString().length > 0;
+        if (selecting && !(e.metaKey || e.ctrlKey)) return;
+        e.preventDefault();
+        window.open(href, "_blank", "noopener,noreferrer");
+      });
       return editor;
     }
 

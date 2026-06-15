@@ -15,24 +15,28 @@
 
 /* Dark theme (default). Applied when html[data-theme="dark"] OR when no
    data-theme is set yet (safety net for the half-frame before bootstrap).
-   Yellow accent (--color-accent: #fde047) — sticky note vibe on dark. */
+   Navy-slate palette (cool blue-tinted, GitHub-Dark-Dimmed / Linear vibe) —
+   replaces the old pure-near-black (#0a0a0a) which the user found harsh. The
+   backgrounds carry a deliberate blue undertone so the app chrome reads as
+   "navy" while the pastel sticky swatches (theme-independent) pop against it.
+   Yellow accent (--color-accent: #fde047) stays — the sticky-note signature. */
 :root,
 html[data-theme="dark"] {
-  --color-bg: #0a0a0a;
-  --color-bg-subtle: #111111;
-  --color-bg-muted: #1a1a1a;
-  --color-border: #262626;
-  --color-border-strong: #404040;
-  --color-fg: #fafafa;
-  --color-fg-muted: #a3a3a3;
-  --color-fg-subtle: #737373;
+  --color-bg: #0d1424;
+  --color-bg-subtle: #141d31;
+  --color-bg-muted: #1e2942;
+  --color-border: #2b3651;
+  --color-border-strong: #3c4b6c;
+  --color-fg: #e9eef8;
+  --color-fg-muted: #9fb0cc;
+  --color-fg-subtle: #6c7d9d;
   --color-accent: #fde047;
   --color-accent-soft: #fef08a;
   --color-accent-strong: #fde047;
   --color-success: #4ade80;
   --color-online: #22c55e;
   --color-warning: #f7b955;
-  --color-danger: #ff4444;
+  --color-danger: #ff5d6c;
   color-scheme: dark;
 }
 
@@ -628,6 +632,32 @@ html[data-theme="dark"] .sticky-card.is-selected:hover {
   border-left-color: var(--note-edge);
   color: var(--note-ink);
   opacity: 0.85;
+}
+/* Inline code + code blocks on a TINTED note surface: the prose text is forced
+   to --note-ink (near-black) for legibility on the pastel, but code keeps the
+   themed --color-bg-muted background — in dark mode that's navy, so near-black
+   ink on navy = INVISIBLE (the user's bug). Re-tint code to sit on the note.
+
+   ⚠️ Do NOT use color-mix(... var(--note-*) ...) here — the CSS minifier
+   (lightningcss) collapses it to a bare var(), dropping the alpha → a solid
+   block (same trap as the selected-card glow). Static rgba() instead: the
+   swatches are ALL light pastels with a near-black --note-ink in BOTH themes,
+   so a fixed translucent-black wash gives a consistent subtle "inset paper"
+   look on every colour without per-note computation. */
+#app-root[style*="--note-bg"] #editor-host .aotn-prose code {
+  background: rgba(28, 25, 23, 0.1);
+  border-color: rgba(28, 25, 23, 0.18);
+  color: var(--note-ink);
+}
+#app-root[style*="--note-bg"] #editor-host .aotn-prose pre {
+  background: rgba(28, 25, 23, 0.08);
+  border-color: rgba(28, 25, 23, 0.14);
+  color: var(--note-ink);
+}
+#app-root[style*="--note-bg"] #editor-host .aotn-prose pre code {
+  background: none;
+  border: none;
+  color: var(--note-ink);
 }
 /* The editor toolbar (color · pin · delete) shares the note color so the top
    strip doesn't float as a gray band above a colored body. */
