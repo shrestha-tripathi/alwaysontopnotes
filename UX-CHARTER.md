@@ -49,7 +49,7 @@ back to the user verbatim:
 ### Social proof angles to chase (Phase 4)
 
 - **GitHub stars badge** (live count) — credibility for open-source skeptics
-- **"Used by N people right now"** counter — privacy-safe (no tracking, just a CF KV counter)
+- **"Used by N people right now"** counter — privacy-safe (aggregate only, a CF KV counter)
 - **Tweets from devs / remote workers** — "this replaced Stickies for me"
 - **Comparison screenshots** — actual side-by-side: us vs Windows Sticky Notes hidden behind Zoom
 
@@ -278,8 +278,9 @@ Privacy claims are cheap. We make them tangible:
   highlights that no XHR requests fire on note save
 - **GitHub link** on every page — not buried in footer
 - **MIT license badge** visible in the footer + about page
-- **No cookies** banner needed (because we don't set any) — but a one-liner:
-  "🍪 No cookies. No tracking. Just notes."
+- **Privacy one-liner** (never claim "no cookies" — the site runs GA4 and may
+  serve AdSense): "🔒 Your notes never leave your device." Scope every trust
+  claim to product data, not to site analytics.
 
 ---
 

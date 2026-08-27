@@ -67,6 +67,25 @@ Also read **`DESIGN.md`** before any UI work. It is the visual contract.
 `/contact`, `/privacy-policy`, `/terms`, `/404`, plus `sitemap.xml` and
 `robots.txt`.
 
+## Privacy-claim discipline (HARD RULE — do not revert)
+
+The moat is **PRODUCT DATA**, not analytics.
+
+- ✅ ALWAYS TRUE, keep prominent: *your notes never leave your device* — notes
+  live in browser local storage / IndexedDB, never on our infrastructure, and
+  no code path uploads or reads note content.
+- ❌ NEVER write "no tracking", "zero tracking", "no analytics", "cookieless",
+  "no cookies", or "no ads" in user-facing copy. The site runs a **live GA4
+  property** (`gaId` in `src/site.config.ts`) and is **AdSense-ready** — those
+  claims are false and are an AdSense policy risk.
+- Correct framing: notes are private to the device; the *website* uses
+  anonymous analytics and may show ads. Confident, not apologetic.
+- `/privacy-policy` must keep its AdSense + **DART cookie** paragraph with the
+  opt-out links (`google.com/settings/ads`, `aboutads.info/choices`).
+
+Before commit: `grep -rniE 'no tracking|no analytics|cookieless|no ads' src/`
+must return nothing contradictory.
+
 ## Verify before commit
 
 ```bash
