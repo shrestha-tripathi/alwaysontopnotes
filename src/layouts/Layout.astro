@@ -65,6 +65,11 @@ const jsonLdOrg = {
   name: site.name,
   url: site.url,
   sameAs: [site.githubRepo].filter(Boolean),
+  parentOrganization: {
+    "@type": "Organization",
+    name: site.publisherName,
+    url: site.publisherUrl,
+  },
 };
 const jsonLdWebSite = {
   "@context": "https://schema.org",

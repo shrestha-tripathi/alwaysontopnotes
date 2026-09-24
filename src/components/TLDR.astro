@@ -1,0 +1,16 @@
+---
+/** Answer-first TL;DR (GEO). Facts only — mirrors what the code actually does. */
+import { site, lastUpdatedLabel } from "../site.config";
+export interface Props { class?: string }
+const { class: cls = "" } = Astro.props;
+---
+<section class={`mx-auto max-w-[1200px] px-6 md:px-12 ${cls}`} aria-label="TL;DR">
+  <div class="max-w-3xl rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-subtle)] p-5">
+    <p class="text-base leading-relaxed text-[var(--color-fg)]">
+      <strong>TL;DR:</strong> {site.name} is a free sticky-notes web app that runs entirely in your browser.
+      Notes are saved on your device (IndexedDB) and can pop out into an always-on-top floating window that stays above
+      Zoom, Teams or full-screen video. Key limit: the floating window needs desktop Chrome or Edge 116+.
+    </p>
+    <p class="mt-2 text-sm text-[var(--color-fg-muted)]">Last updated {lastUpdatedLabel}</p>
+  </div>
+</section>
