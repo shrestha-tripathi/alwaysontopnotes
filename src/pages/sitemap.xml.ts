@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { site } from "../site.config";
+import { pseo } from "../data/pseo";
 
 /**
  * Sitemap — ONLY real, indexable, public pages belong here.
@@ -23,6 +24,8 @@ const pages = [
   { path: "/contact", priority: 0.5, changefreq: "yearly" },
   { path: "/privacy-policy", priority: 0.3, changefreq: "yearly" },
   { path: "/terms", priority: 0.3, changefreq: "yearly" },
+  { path: "/guides", priority: 0.7, changefreq: "monthly" },
+  ...pseo.map((e) => ({ path: `/guides/${e.slug}`, priority: 0.6, changefreq: "monthly" })),
 ];
 
 const today = new Date().toISOString().split("T")[0];
