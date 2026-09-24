@@ -75,6 +75,19 @@ export const site = {
    * worksoffline family id (G-Q1Y0YHLJ8K) it used to share by mistake.
    */
   gaId: env.PUBLIC_GA_MEASUREMENT_ID ?? "G-0BQXBH4REP",
+  /** Parent publisher (worksoffline family). */
+  publisherName: "WorksOffline",
+  publisherUrl: "https://worksoffline.in",
+  /** Freshness — ONE constant drives visible "Last updated" + JSON-LD dateModified. */
+  lastUpdated: "2026-09-24",
 } as const;
+
+export const lastUpdatedLabel = new Date(site.lastUpdated + "T00:00:00Z").toLocaleDateString("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+export const absoluteUrl = (path: string): string => new URL(path, site.url).href;
 
 export type SiteConfig = typeof site;
