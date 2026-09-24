@@ -59,6 +59,10 @@ export const faqGroups = [
     icon: "type",
     items: [
       {
+        q: "Can AI agents use it (WebMCP)?",
+        a: "Yes — AI agent ready (WebMCP). In browsers that expose navigator.modelContext, the /app page registers three tools: create_note (text), list_notes, and open_floating. They drive the same local notes store you use, so notes still never leave your device. Opening the floating window may still need your click, because browsers require a user gesture for Picture-in-Picture. In other browsers nothing changes.",
+      },
+      {
         q: "Can I use markdown?",
         a: "Yes — the editor (built on Tiptap) supports markdown shortcuts as you type. Type `# ` for a heading, `- ` for a list, `[ ] ` for a checkbox, `**bold**` for bold, ` ``code`` ` for inline code, and so on. You can also paste markdown and it renders rich, or paste rich text and it's preserved. Export gives you clean markdown back.",
       },
