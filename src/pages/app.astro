@@ -548,6 +548,7 @@ import { site } from "../site.config";
     import { initPwaInstall } from "../lib/pwaInstall";
     import { initThemeToggle } from "../lib/themeToggle";
     import { initPipStack } from "../lib/pipStack";
+    import { registerWebMcpTools, text as mcpText } from "../lib/webmcp";
     import type { StickyColor } from "../lib/types";
     import type { Editor } from "@tiptap/core";
     import type { JSONContent } from "../lib/types";
@@ -1887,6 +1888,56 @@ import { site } from "../site.config";
         void notesStore.seedNote(welcomeDoc() as JSONContent, WELCOME_COLOR);
       }
       render(notesStore.get());
+
+      // WebMCP (progressive enhancement): agent tools drive the EXISTING store
+      // + PiP toggle. No-op when navigator.modelContext is absent.
+      registerWebMcpTools([
+        {
+          name: "create_note",
+          description:
+            "Create a new sticky note from markdown/plain text. Saved locally in this browser (IndexedDB); nothing is uploaded.",
+          inputSchema: {
+            type: "object",
+            properties: { text: { type: "string", description: "Note content (markdown supported)." } },
+            required: ["text"],
+          },
+          execute: async (args) => {
+            const t = typeof args.text === "string" ? args.text : "";
+            if (!t.trim()) return mcpText("Error: 'text' is required.");
+            const id = await notesStore.seedNote(markdownToDoc(t));
+            focusEditorSoon();
+            return mcpText(`Created note ${id}. It is stored only on this device.`);
+          },
+        },
+        {
+          name: "list_notes",
+          description: "List notes in this browser (pinned first, then most recently updated): id, title, colour, preview.",
+          inputSchema: { type: "object", properties: {} },
+          execute: async () => {
+            const idx = notesStore.get().index;
+            if (idx.length === 0) return mcpText("No notes yet.");
+            return mcpText(JSON.stringify(idx.map((n) => ({ id: n.id, title: n.title, color: n.color, pinned: n.pinned, preview: n.preview, updatedAt: new Date(n.updatedAt).toISOString() })), null, 2));
+          },
+        },
+        {
+          name: "open_floating",
+          description:
+            "Pop the current note out into the always-on-top floating window (Document Picture-in-Picture, desktop Chrome/Edge 116+). Browsers may require a user click; if blocked, ask the user to press the pop-out button.",
+          inputSchema: { type: "object", properties: {} },
+          execute: async () => {
+            if (!isPipSupported()) return mcpText("Floating window unsupported in this browser (needs desktop Chrome/Edge 116+).");
+            if (isPipOpen()) return mcpText("Floating window is already open.");
+            try {
+              await togglePip();
+            } catch {
+              /* fall through */
+            }
+            return isPipOpen()
+              ? mcpText("Floating window opened.")
+              : mcpText("The browser blocked opening the floating window (it needs a user gesture). Ask the user to click the pop-out button.");
+          },
+        },
+      ]);
     })();
   </script>
 </Layout>
