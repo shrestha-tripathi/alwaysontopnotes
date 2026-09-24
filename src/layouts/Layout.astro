@@ -33,6 +33,8 @@ export interface Props {
    * (publisher refs) so the graph stays connected.
    */
   jsonLd?: Record<string, unknown>[];
+  /** Skip the auto 2-level breadcrumb (page supplies its own BreadcrumbList). */
+  customBreadcrumb?: boolean;
 }
 
 const {
@@ -42,6 +44,7 @@ const {
   ogImage,
   noindex = false,
   jsonLd = [],
+  customBreadcrumb = false,
 } = Astro.props;
 
 const pageTitle = title ? `${title} · ${site.name}` : `${site.name} · ${site.tagline}`;
@@ -83,7 +86,7 @@ const jsonLdWebSite = {
 // Auto-breadcrumb: Home -> <title> on every non-home page (DRY — one edit
 // covers all routes). Skipped on the homepage where it would be noise.
 const breadcrumbSchema =
-  title && Astro.url.pathname !== "/"
+  !customBreadcrumb && title && Astro.url.pathname !== "/"
     ? {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
